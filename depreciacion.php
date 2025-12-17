@@ -46,7 +46,18 @@
         }
 		
         function f_filtro_sucursal(data){
-            xajax_f_filtro_sucursal(xajax.getFormValues("form1"), data);           
+            xajax_f_filtro_sucursal(xajax.getFormValues("form1"), data);
+        }
+
+        function cargar_sucu(){
+            f_filtro_sucursal(document.getElementById('sucursal').value);
+            f_filtro_anio('anio_desde');
+            f_filtro_anio('anio_hasta');
+            eliminar_lista_mes('mes_desde');
+            eliminar_lista_mes('mes_hasta');
+            eliminar_lista_subgrupo();
+            eliminar_lista_activo_desde();
+            eliminar_lista_activo_hasta();
         }
    
         function eliminar_lista_sucursal() {
@@ -341,14 +352,12 @@
                                 <label for="cod_activo_desde"> Activo Desde </label>
                                 <select id="cod_activo_desde" name="cod_activo_desde" class="form-control input-sm select2" >
                                     <option value="0">Seleccione una opcion..</option>
-                                    <?=$listaActivos;?>
                                 </select>
                             </div>
                             <div class="col-md-3">
                                 <label for="cod_activo_hasta"> Activo Hasta </label>
                                 <select id="cod_activo_hasta" name="cod_activo_hasta" class="form-control input-sm select2" >
                                     <option value="0">Seleccione una opcion..</option>
-                                    <?=$listaActivos;?>
                                 </select>
                             </div>
                         </div>

@@ -67,6 +67,7 @@ function f_filtro_anio($aForm, $data)
 
     $oReturn = new xajaxResponse();
     $idempresa = $_SESSION['U_EMPRESA'];
+    $idsucursal = $_SESSION['U_SUCURSAL'];
     //variables formulario
     $empresa = $aForm['empresa'];
     $target = !empty($data) ? $data : 'anio_desde';
@@ -116,18 +117,29 @@ function f_filtro_activos_desde($aForm)
     $empresa = $aForm['empresa'];
     $sucursal = $aForm['sucursal'];
     $subgrupo = $aForm['cod_subgrupo'];
+    $grupo    = $aForm['cod_grupo'];
     if (empty($empresa)) {
         $empresa = $idempresa;
     }
     if (empty($sucursal)) {
         $sucursal = $idsucursal;
     }
+
+    $filtro = "where act_cod_empr = '$empresa'";
+    if (!empty($sucursal) && $sucursal != '0') {
+        $filtro .= " and act_cod_sucu = '$sucursal'";
+    }
+    if (!empty($subgrupo) && $subgrupo != '0') {
+        $filtro .= " and sgac_cod_sgac  = '$subgrupo'";
+    } elseif (!empty($grupo) && $grupo != '0') {
+        $filtro .= " and sgac_cod_sgac in (select sgac_cod_sgac from saesgac where gact_cod_gact = '$grupo' and sgac_cod_empr = '$empresa')";
+    }
+
     // DATOS DEL ACTIVO
     $sql = "select act_cod_act, act_nom_act, act_clave_act
-			from saeact
-			where act_cod_empr = '$empresa'	
-			and sgac_cod_sgac  = '$subgrupo'
-			order by act_cod_act";
+                        from saeact
+                        $filtro
+                        order by act_cod_act";
     //echo $sql; exit;
     $i = 1;
     if ($oIfx->Query($sql)) {
@@ -166,18 +178,29 @@ function f_filtro_activos_hasta($aForm)
     $empresa = $aForm['empresa'];
     $sucursal = $aForm['sucursal'];
     $subgrupo = $aForm['cod_subgrupo'];
+    $grupo    = $aForm['cod_grupo'];
     if (empty($empresa)) {
         $empresa = $idempresa;
     }
     if (empty($sucursal)) {
         $sucursal = $idsucursal;
     }
+
+    $filtro = "where act_cod_empr = '$empresa'";
+    if (!empty($sucursal) && $sucursal != '0') {
+        $filtro .= " and act_cod_sucu = '$sucursal'";
+    }
+    if (!empty($subgrupo) && $subgrupo != '0') {
+        $filtro .= " and sgac_cod_sgac  = '$subgrupo'";
+    } elseif (!empty($grupo) && $grupo != '0') {
+        $filtro .= " and sgac_cod_sgac in (select sgac_cod_sgac from saesgac where gact_cod_gact = '$grupo' and sgac_cod_empr = '$empresa')";
+    }
+
     // DATOS DEL ACTIVO
     $sql = "select act_cod_act, act_nom_act, act_clave_act
-			from saeact
-			where act_cod_empr = '$empresa'		
-			and sgac_cod_sgac  = '$subgrupo'
-			order by act_cod_act";
+                        from saeact
+                        $filtro
+                        order by act_cod_act";
     //echo $sql; exit;
     $i = 1;
     if ($oIfx->Query($sql)) {
