@@ -53,11 +53,11 @@
             f_filtro_sucursal(document.getElementById('sucursal').value);
             f_filtro_anio('anio_desde');
             f_filtro_anio('anio_hasta');
-            eliminar_lista_mes('mes_desde');
-            eliminar_lista_mes('mes_hasta');
             eliminar_lista_subgrupo();
             eliminar_lista_activo_desde();
             eliminar_lista_activo_hasta();
+            f_filtro_activos_desde();
+            f_filtro_activos_hasta();
         }
    
         function eliminar_lista_sucursal() {
@@ -97,10 +97,6 @@
         }
 
 		
-        function f_filtro_mes(target){
-            xajax_f_filtro_mes(xajax.getFormValues("form1"), target);
-        }
-
         function eliminar_lista_mes(targetId) {
             var selectId = targetId || "mes";
             var sel = document.getElementById(selectId);
@@ -110,12 +106,34 @@
             }
         }
 
-        function anadir_elemento_mes(x, i, elemento, targetId) {
+        function cargar_meses(targetId) {
             var selectId = targetId || "mes";
-            var lista = document.form1[selectId];
-            var option = new Option(elemento, i);
-            lista.options[x] = option;
-            lista.value = i;
+            var sel = document.getElementById(selectId);
+            if (!sel) { return; }
+            var meses = [
+                [1, 'Enero'],
+                [2, 'Febrero'],
+                [3, 'Marzo'],
+                [4, 'Abril'],
+                [5, 'Mayo'],
+                [6, 'Junio'],
+                [7, 'Julio'],
+                [8, 'Agosto'],
+                [9, 'Septiembre'],
+                [10, 'Octubre'],
+                [11, 'Noviembre'],
+                [12, 'Diciembre']
+            ];
+            var valorActual = sel.value;
+            eliminar_lista_mes(selectId);
+            for (var i = 0; i < meses.length; i++) {
+                var optIndex = i + 1; // respeta el placeholder en la posición 0
+                var option = new Option(meses[i][1], meses[i][0]);
+                sel.options[optIndex] = option;
+            }
+            if (valorActual) {
+                sel.value = valorActual;
+            }
         }
 		function f_filtro_grupo(data){
             xajax_f_filtro_grupo(xajax.getFormValues("form1"), data);           
@@ -245,20 +263,13 @@
                                 $lista_sucu = lista_boostrap_func($oIfx, $sql, $idsucursal, 'sucu_cod_sucu',  'sucu_nom_sucu' );    
                                 // FECHAS
                                 $id_anio = date("Y");
-                                $id_mes  = date("m");
-								$fechaActual = date("Y-m-d");
+                                $fechaActual = date("Y-m-d");
                                 $sql = "select ejer_cod_ejer from saeejer where date_part('year',ejer_fec_inil) = $id_anio and ejer_cod_empr = $idempresa ";
                                 $ejer_cod_ejer = consulta_string_func($sql, 'ejer_cod_ejer', $oIfx, 0);
 
                                 $sql = "select ejer_cod_ejer,  date_part('year',ejer_fec_inil) as anio from saeejer where
                                                 ejer_cod_empr = $idempresa order by 2 desc ";
-                                $lista_ejer = lista_boostrap_func($oIfx, $sql, $id_anio, 'anio',  'anio' );   
-
-                                $sql = "select prdo_num_prdo, prdo_nom_prdo from saeprdo where
-                                                prdo_cod_empr = $idempresa and
-                                                prdo_cod_ejer = $ejer_cod_ejer
-                                                order by 1 ";
-                                $lista_mes = lista_boostrap_func($oIfx, $sql, $id_mes, 'prdo_num_prdo',  'prdo_nom_prdo' );
+                                $lista_ejer = lista_boostrap_func($oIfx, $sql, $id_anio, 'anio',  'anio' );
                                 // LISTA GRUPOS
                                 $sql = " SELECT gact_cod_gact, gact_des_gact
                                         FROM saegact
@@ -290,14 +301,14 @@
                             </div>
                             <div class="col-md-3">
                                 <label for="sucursal">* Sucursal </label>
-                                <select id="sucursal" name="sucursal" class="form-control input-sm select2" onchange="f_filtro_anio('anio_desde'); f_filtro_anio('anio_hasta'); f_filtro_grupo();"  required>
+                                <select id="sucursal" name="sucursal" class="form-control input-sm select2" onchange="f_filtro_anio('anio_desde'); f_filtro_anio('anio_hasta'); f_filtro_grupo(); f_filtro_activos_desde(); f_filtro_activos_hasta();"  required>
                                     <option value="0">Seleccione una opcion..</option>  
                                     <?=$lista_sucu;?>                                  
                                 </select>
                             </div>
                             <div class="col-md-3">
                                 <label for="anio_desde"> * Desde Año </label>
-                                <select id="anio_desde" name="anio_desde" class="form-control input-sm select2"  onchange="f_filtro_mes('mes_desde');" required>
+                                <select id="anio_desde" name="anio_desde" class="form-control input-sm select2" required>
                                     <option value="">Seleccione una opcion..</option>
                                     <?=$lista_ejer;?>
                                 </select>
@@ -307,7 +318,6 @@
                                 <label for="mes_desde"> Desde Mes </label>
                                 <select id="mes_desde" name="mes_desde" class="form-control input-sm select2">
                                     <option value="">Seleccione una opcion..</option>
-                                    <?=$lista_mes;?>
                                 </select>
                             </div>
                         </div>
@@ -317,7 +327,7 @@
                         <div class="form-row">
                             <div class="col-md-3">
                                 <label for="anio_hasta"> * Hasta Año </label>
-                                <select id="anio_hasta" name="anio_hasta" class="form-control input-sm select2"  onchange="f_filtro_mes('mes_hasta');" required>
+                                <select id="anio_hasta" name="anio_hasta" class="form-control input-sm select2" required>
                                     <option value="">Seleccione una opcion..</option>
                                     <?=$lista_ejer;?>
                                 </select>
@@ -327,7 +337,6 @@
                                 <label for="mes_hasta"> Hasta Mes </label>
                                 <select id="mes_hasta" name="mes_hasta" class="form-control input-sm select2">
                                     <option value="">Seleccione una opcion..</option>
-                                    <?=$lista_mes;?>
                                 </select>
                             </div>
                         </div>
@@ -336,7 +345,7 @@
                         <div class="form-row">                            
                             <div class="col-md-3">
                                 <label for="cod_grupo"> Grupo </label>
-                                <select id="cod_grupo" name="cod_grupo" class="form-control input-sm select2" onchange="f_filtro_subgrupo();">
+                                <select id="cod_grupo" name="cod_grupo" class="form-control input-sm select2" onchange="f_filtro_subgrupo(); f_filtro_activos_desde(); f_filtro_activos_hasta();">
                                     <option value="0">Seleccione una opcion..</option>
                                     <?=$listaGrupo;?>
                                 </select>
@@ -376,7 +385,15 @@
         </div>
     </body>
          
-    <script>genera_cabecera_formulario(); generaSelect2();/*genera_detalle();genera_form_detalle();*/</script> 
+    <script>
+        genera_cabecera_formulario();
+        generaSelect2();
+        cargar_meses('mes_desde');
+        cargar_meses('mes_hasta');
+        f_filtro_activos_desde();
+        f_filtro_activos_hasta();
+        /*genera_detalle();genera_form_detalle();*/
+    </script>
     <? /*     * ***************************************************************** */ ?>
     <? /* NO MODIFICAR ESTA SECCION */ ?>
 <? } ?>
