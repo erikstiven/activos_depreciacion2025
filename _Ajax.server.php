@@ -69,6 +69,7 @@ function f_filtro_anio($aForm, $data)
     $idempresa = $_SESSION['U_EMPRESA'];
     //variables formulario
     $empresa = $aForm['empresa'];
+    $target = !empty($data) ? $data : 'anio_desde';
     if (empty($empresa)) {
         $empresa = $idempresa;
     }
@@ -80,14 +81,14 @@ function f_filtro_anio($aForm, $data)
     //echo $sql; exit;
     $i = 1;
     if ($oIfx->Query($sql)) {
-        $oReturn->script('eliminar_lista_anio();');
+        $oReturn->script('eliminar_lista_anio(\'' . $target . '\');');
         if ($oIfx->NumFilas() > 0) {
             do {
-                $oReturn->script(('anadir_elemento_anio(' . $i++ . ',\'' . $oIfx->f('anio_i') . '\',\'' . $oIfx->f('anio_i') . '\')'));
+                $oReturn->script(('anadir_elemento_anio(' . $i++ . ',\'' . $oIfx->f('anio_i') . '\',\'' . $oIfx->f('anio_i') . '\', \'" . $target . "\')'));
             } while ($oIfx->SiguienteRegistro());
         }
     }
-    $oReturn->assign('anio', 'value', $data);
+    $oReturn->assign($target, 'value', $aForm[$target]);
     return $oReturn;
 }
 
@@ -209,14 +210,19 @@ function f_filtro_mes($aForm, $data)
 
     $oReturn = new xajaxResponse();
 
-    //variables formulario
-    $anio = $aForm['anio'];
     $empresa = $_SESSION['U_EMPRESA'];
+    $target = !empty($data) ? $data : 'mes_desde';
+    $anioField = ($target === 'mes_hasta') ? 'anio_hasta' : 'anio_desde';
+    $anio = $aForm[$anioField];
+
+    if (empty($anio)) {
+        return $oReturn;
+    }
     // DATOS DEL ACTIVO
     $sql = "select prdo_num_prdo, prdo_nom_prdo
-			from saeprdo
-			where prdo_cod_empr = '$empresa'
-			and prdo_cod_ejer  = (select ejer_cod_ejer 
+                        from saeprdo
+                        where prdo_cod_empr = '$empresa'
+                        and prdo_cod_ejer  = (select ejer_cod_ejer
 									from saeejer 
 									where ejer_cod_empr = '$empresa' 
 									and date_part('year',ejer_fec_inil) = $anio)
@@ -224,15 +230,14 @@ function f_filtro_mes($aForm, $data)
     //echo $sql; exit;
     $i = 1;
     if ($oIfx->Query($sql)) {
-        $oReturn->script('eliminar_lista_mes();');
+        $oReturn->script('eliminar_lista_mes(\'' . $target . '\');');
         if ($oIfx->NumFilas() > 0) {
             do {
-                $oReturn->script(('anadir_elemento_mes(' . $i++ . ',\'' . $oIfx->f('prdo_num_prdo') . '\', \'' . $oIfx->f('prdo_nom_prdo') . '\' )'));
+                $oReturn->script(('anadir_elemento_mes(' . $i++ . ',\'' . $oIfx->f('prdo_num_prdo') . '\', \'' . $oIfx->f('prdo_nom_prdo') . '\', \'" . $target . "\' )'));
             } while ($oIfx->SiguienteRegistro());
         }
     }
-
-    $oReturn->assign('mes', 'value', $data);
+    $oReturn->assign($target, 'value', $aForm[$target]);
 
     return $oReturn;
 }
@@ -363,7 +368,6 @@ function generar($aForm = '')
     $oReturn = new xajaxResponse();
 
     //variables de sesion
-    $array = ($_SESSION['ARRAY_PINTA']);
     $usuario_web = $_SESSION['U_ID'];
     $idempresa = $_SESSION['U_EMPRESA'];
     $idsucursal = $_SESSION['U_SUCURSAL'];
@@ -384,45 +388,114 @@ function generar($aForm = '')
     $subgrupo      = $aForm['cod_subgrupo'];
     $activo_desde = $aForm['cod_activo_desde'];
     $activo_hasta = $aForm['cod_activo_hasta'];
-    $anio           = $aForm['anio'];
-    $mes           = $aForm['mes'];
-    $dia           = date("d", (mktime(0, 0, 0, $mes + 1, 1, $anio) - 1));
-    //$fecha_hasta = $dia.'/'.$mes.'/'.$anio;
-    $fecha_hasta = $anio . '-' . $mes . '-' . $dia;
-    $fechaServer = date("Y-m-d");
-    //echo $fecha_hasta; 
+    $anio_desde    = $aForm['anio_desde'];
+    $mes_desde     = $aForm['mes_desde'];
+    $anio_hasta    = $aForm['anio_hasta'];
+    $mes_hasta     = $aForm['mes_hasta'];
 
-    // ARMA FECHA ANTERIOR
-    if ($mes > 1) {
-        $mesAnterior = $mes - 1;
-        $anioAnterior =  $anio;
-    } else {
-        $mesAnterior = 12;
-        $anioAnterior =  $anio - 1;
+    if (empty($anio_desde) || empty($mes_desde) || empty($anio_hasta) || empty($mes_hasta)) {
+        $oReturn->alert('Debe ingresar el rango completo de meses y años.');
+        return $oReturn;
     }
-    $diaAnterior = date("d", (mktime(0, 0, 0, $mesAnterior + 1, 1, $anioAnterior) - 1));
-    $fechaAnterior = $anioAnterior . '-' . $mesAnterior . '-' . $diaAnterior;
-    // echo $fechaAnterior; exit;
+
+    $fechaDesde = DateTime::createFromFormat('Y-n-j', $anio_desde . '-' . $mes_desde . '-01');
+    $fechaHasta = DateTime::createFromFormat('Y-n-j', $anio_hasta . '-' . $mes_hasta . '-01');
+
+    if (!$fechaDesde || !$fechaHasta) {
+        $oReturn->alert('Rango de fechas inválido.');
+        return $oReturn;
+    }
+
+    if ($fechaDesde > $fechaHasta) {
+        $oReturn->alert('La fecha inicial debe ser menor o igual a la fecha final.');
+        return $oReturn;
+    }
+
     // ARMAR FILTROS
     $filtro = '';
-    if (empty($grupo)) {
-    } else {
+    if (!empty($grupo)) {
         $filtro = " and saeact.gact_cod_gact = '" . $grupo . "'";
     }
-    if (empty($subgrupo)) {
-    } else {
+    if (!empty($subgrupo)) {
         $filtro .= " and saeact.sgac_cod_sgac = '" . $subgrupo . "'";
     }
-    if (empty($activo_desde) || empty($activo_hasta)) {
-    } else {
+    if (!empty($activo_desde) && !empty($activo_hasta)) {
         $filtro .= " and act_cod_act between " . $activo_desde . " and " . $activo_hasta;
     }
-    //echo $filtro; exit;
+
+    $fechasProceso = [];
+    $periodo = new DatePeriod($fechaDesde, new DateInterval('P1M'), (clone $fechaHasta)->modify('+1 month'));
+    foreach ($periodo as $fecha) {
+        $fechasProceso[] = $fecha;
+    }
+
+    if (empty($fechasProceso)) {
+        $oReturn->alert('No hay meses que procesar en el rango seleccionado.');
+        return $oReturn;
+    }
+
+    // Validar valores en saemet para cada mes antes de iniciar
+    foreach ($fechasProceso as $fecha) {
+        $fecha_hasta = $fecha->format('Y-m-t');
+        $sqlExisteMetd = "select count(1) as existe from saemet where metd_has_fech = '$fecha_hasta' and metd_cod_empr =  $empresa";
+        $existeMetd = consulta_string($sqlExisteMetd, 'existe', $oIfx, 0);
+        if ($existeMetd == 0) {
+            $oReturn->alert('No existe valor mensual en saemet para la fecha ' . $fecha_hasta . '.');
+            return $oReturn;
+        }
+    }
+
+    // Obtener lista de activos una sola vez
+    $sqlActivos = "  SELECT saeact.act_cod_act,
+                                                 saeact.act_vutil_act,
+                                                 saeact.act_val_comp,
+                                                 saeact.act_fcmp_act,
+                                                 saeact.tdep_cod_tdep,
+                                                 saeact.act_fdep_act,
+                                                 saeact.act_fcorr_act,
+                                                 saesgac.gact_cod_gact,
+                                                 saeact.sgac_cod_sgac,
+                                                 saeact.act_cod_sucu,
+                                                 saeact.act_vres_act
+                                        FROM saeact,
+                                                 saesgac
+                                   WHERE ( saesgac.sgac_cod_sgac = saeact.sgac_cod_sgac ) and
+                                                 ( saesgac.sgac_cod_empr = saeact.act_cod_empr ) and
+                                                 ( saeact.act_clave_padr is null or saeact.act_clave_padr = '') and
+                                                 ( saeact.act_cod_empr = $empresa ) AND
+                                                 saeact.act_ext_act = 1
+                                                 $filtro";
+
+    $activos = [];
+    if ($oIfxA->Query($sqlActivos)) {
+        if ($oIfxA->NumFilas() > 0) {
+            do {
+                $activos[] = [
+                    'act_cod_act'     => $oIfxA->f('act_cod_act'),
+                    'act_vutil_act'   => $oIfxA->f('act_vutil_act'),
+                    'act_val_comp'    => $oIfxA->f('act_val_comp'),
+                    'act_fcmp_act'    => $oIfxA->f('act_fcmp_act'),
+                    'tdep_cod_tdep'   => $oIfxA->f('tdep_cod_tdep'),
+                    'act_fdep_act'    => $oIfxA->f('act_fdep_act'),
+                    'act_fcorr_act'   => $oIfxA->f('act_fcorr_act'),
+                    'gact_cod_gact'   => $oIfxA->f('gact_cod_gact'),
+                    'sgac_cod_sgac'   => $oIfxA->f('sgac_cod_sgac'),
+                    'act_cod_sucu'    => $oIfxA->f('act_cod_sucu'),
+                    'act_vres_act'    => $oIfxA->f('act_vres_act'),
+                ];
+            } while ($oIfxA->SiguienteRegistro());
+        }
+    }
+
+    $oReturn->alert('Se procesarán ' . count($fechasProceso) . ' meses y ' . count($activos) . ' activos.');
+
     try {
         $oIfx->QueryT('BEGIN');
+
         // TIPO DE DEPRECIACION
-        $sql_tipo = "select tdep_cod_tdep, tdep_tip_val 
-						from saetdep";
+        $arrayTipoDepre = [];
+        $sql_tipo = "select tdep_cod_tdep, tdep_tip_val
+                                                from saetdep";
 
         if ($oIfx->Query($sql_tipo)) {
             if ($oIfx->NumFilas() > 0) {
@@ -434,123 +507,86 @@ function generar($aForm = '')
         }
 
         $oIfx->Free();
-        // CALCULA GASTO DEPRECIACION
-        $sql = "select metd_cod_acti, metd_val_metd 
-					from saemet 
-					where metd_has_fech = '$fecha_hasta'
-					and metd_cod_empr   =  $empresa					
-					";
-        //echo $sql; exit;		
-        if ($oIfx->Query($sql)) {
-            if ($oIfx->NumFilas() > 0) {
-                unset($arrayValorDepre);
-                do {
-                    $arrayValorDepre[$oIfx->f('metd_cod_acti')] = $oIfx->f('metd_val_metd');
-                } while ($oIfx->SiguienteRegistro());
+        $fechaServer = date("Y-m-d");
+
+        foreach ($fechasProceso as $fechaProceso) {
+            $anio = (int)$fechaProceso->format('Y');
+            $mes  = (int)$fechaProceso->format('n');
+            $fecha_hasta = $fechaProceso->format('Y-m-t');
+            $fechaAnterior = (clone $fechaProceso)->modify('-1 month')->format('Y-m-t');
+
+            // CALCULA GASTO DEPRECIACION POR MES
+            $arrayValorDepre = [];
+            $sql = "select metd_cod_acti, metd_val_metd
+                                        from saemet
+                                        where metd_has_fech = '$fecha_hasta'
+                                        and metd_cod_empr   =  $empresa
+                                        ";
+            if ($oIfx->Query($sql)) {
+                if ($oIfx->NumFilas() > 0) {
+                    unset($arrayValorDepre);
+                    do {
+                        $arrayValorDepre[$oIfx->f('metd_cod_acti')] = $oIfx->f('metd_val_metd');
+                    } while ($oIfx->SiguienteRegistro());
+                }
             }
-        }
-        $oIfx->Free();
+            $oIfx->Free();
 
-        $sql = "  SELECT saeact.act_cod_act,   
-						 saeact.act_vutil_act,   
-						 saeact.act_val_comp,   
-						 saeact.act_fcmp_act,   
-						 saeact.tdep_cod_tdep,   
-						 saeact.act_fdep_act,   
-						 saeact.act_fcorr_act,   
-						 saesgac.gact_cod_gact,   
-						 saeact.sgac_cod_sgac,   
-						 saeact.act_cod_sucu,   
-						 saeact.act_vres_act  
-					FROM saeact,   
-						 saesgac  
-				   WHERE ( saesgac.sgac_cod_sgac = saeact.sgac_cod_sgac ) and  
-						 ( saesgac.sgac_cod_empr = saeact.act_cod_empr ) and  
-						 ( saeact.act_clave_padr is null or saeact.act_clave_padr = '') and
-						 ( saeact.act_cod_empr = $empresa ) AND  
-						 --(saeact.act_ext_act <> 0 OR saeact.act_ext_act IS NULL  )    
-						 saeact.act_ext_act = 1
-						 $filtro";
-        //echo $sql; exit;	
-        if ($oIfxA->Query($sql)) {
-            if ($oIfxA->NumFilas() > 0) {
-                do {
-                    // LEER DATOS AVTIVO
-                    $codigo_activo        =    $oIfxA->f('act_cod_act');
-                    $vida_util          =    $oIfxA->f('act_vutil_act');
-                    $valor_compra        =    $oIfxA->f('act_val_comp');
-                    $fecha_compra        =    $oIfxA->f('act_fcmp_act');
-                    $tipo_depreciacion     =    $oIfxA->f('tdep_cod_tdep');
-                    $fecha_depreciacion =   $oIfxA->f('act_fdep_act');
-                    $cod_grupo          =    $oIfxA->f('gact_cod_gact');
-                    $cod_subgrupo          =    $oIfxA->f('sgac_cod_sgac');
-                    $valor_recidual        =     $oIfxA->f('act_vres_act');
-                    $sucursal           =     $oIfxA->f('act_cod_sucu');
+            foreach ($activos as $activo) {
+                $codigo_activo        = $activo['act_cod_act'];
+                $tipo_depreciacion    = $activo['tdep_cod_tdep'];
+                $sucursalActivo       = $activo['act_cod_sucu'];
 
+                $sql_existe = "select count(cdep_gas_depn) as existe
+                                                                        from saecdep
+                                                                        where cdep_cod_acti = $codigo_activo
+                                                                        and cdep_fec_depr = '$fecha_hasta'";
+                $existe = consulta_string($sql_existe, 'existe', $oIfx, 0);
 
-                    // ELIMINAR DEPRECIACION 
-                    $sql_existe = "select count(cdep_gas_depn) as existe
-									from saecdep
-									where cdep_cod_acti = $codigo_activo 
-									and cdep_fec_depr = '$fecha_hasta'";
-                    $existe = consulta_string($sql_existe, 'existe', $oIfx, 0);
+                if ($existe == 1) {
+                    $sql_borra = "delete from saecdep
+                                                                                where cdep_cod_acti = $codigo_activo
+                                                                                and cdep_fec_depr = '$fecha_hasta'";
 
-                    if ($existe == 1) {
-                        $sql_borra = "delete from saecdep 
-										where cdep_cod_acti = $codigo_activo 
-										and cdep_fec_depr = '$fecha_hasta'";
+                    $oIfx->QueryT($sql_borra);
+                }
 
-                        $oIfx->QueryT($sql_borra);
-                    }
+                // GASTO DEPRECIACION
+                $valor_mesual = $arrayValorDepre[$codigo_activo];
+                if (empty($valor_mesual))  $valor_mesual = 0;
 
-                    // GASTO DEPRECIACION
-                    $valor_mesual = $arrayValorDepre[$codigo_activo];
-                    //if (empty($valor_mesual) or $valor_mesual == 0) continue;
-                    if (empty($valor_mesual))  $valor_mesual = 0;
+                // TIPO DE DEPRESIACION MENSUAL(M) - DIARIA (D)
+                $intervalo = $arrayTipoDepre[$tipo_depreciacion];
 
-                    // TIPO DE DEPRESIACION MENSUAL(M) - DIARIA (D)				
-                    $intervalo = $arrayTipoDepre[$tipo_depreciacion];
+                if (empty($intervalo)) {
+                    $intervalo = 'M';
+                }
 
-                    if (empty($intervalo)) {
-                        $intervalo = 'M';
-                    }
-                    //echo $sql_valor_mesual; exit;
-                    // CALCULA DEPRECIACION ACUMULADA
+                $sql_dep_acumulada = "SELECT (coalesce(cdep_dep_acum, 0) +  coalesce(cdep_gas_depn, 0)) as depr_acumulada
+                                                                                from saecdep
+                                                                                where cdep_cod_acti = $codigo_activo
+                                                                                and cdep_fec_depr = '$fechaAnterior'";
+                $valor_acumulado = consulta_string($sql_dep_acumulada, 'depr_acumulada', $oIfx, 0);
 
+                if ($valor_acumulado == 0) {
+                    $valor_anterior = 0;
+                    $valor_acumulado = $valor_mesual;
+                } else {
+                    $valor_anterior = $valor_acumulado - $valor_mesual;
+                }
 
-                    $sql_dep_acumulada = "SELECT (coalesce(cdep_dep_acum, 0) +  coalesce(cdep_gas_depn, 0)) as depr_acumulada
-										from saecdep
-										where cdep_cod_acti = $codigo_activo 
-										and cdep_fec_depr = '$fechaAnterior'";
-                    $valor_acumulado = consulta_string($sql_dep_acumulada, 'depr_acumulada', $oIfx, 0);
-
-
-                    if ($valor_acumulado == 0) {
-                        $valor_anterior = 0;
-                        $valor_acumulado = $valor_mesual;
-                    } else {
-                        $valor_anterior = $valor_acumulado - $valor_mesual;
-                    }
-
-
-
-                    //echo $sql_dep_acumulada;exit;
-                    $registros = consulta_string($sql_dep_acumulada, 'registros', $oIfx, 0);
-                    // INSERTAR DEPRECIACION
-                    $sql_cdep = "INSERT into saecdep (cdep_cod_acti, cdep_cod_tdep,     cdep_mes_depr, cdep_ani_depr, 
-                                                     cdep_fec_depr, act_cod_empr,       act_cod_sucu,  cdep_dep_acum, 
+                $sql_cdep = "INSERT into saecdep (cdep_cod_acti, cdep_cod_tdep,     cdep_mes_depr, cdep_ani_depr,
+                                                     cdep_fec_depr, act_cod_empr,       act_cod_sucu,  cdep_dep_acum,
                                                      cdep_gas_depn, cdep_est_cdep,      cdep_fec_cdep, cdep_val_rep1 )
-					                        values ($codigo_activo, '$tipo_depreciacion', $mes,           $anio, 
-                                                    '$fecha_hasta',  $empresa,            $sucursal,      $valor_acumulado , 
+                                                                values ($codigo_activo, '$tipo_depreciacion', $mes,           $anio,
+                                                    '$fecha_hasta',  $empresa,            $sucursalActivo,      $valor_acumulado ,
                                                     $valor_mesual,      'PE',           '$fechaServer',    $valor_anterior)";
-                    $oIfx->QueryT($sql_cdep);
-                } while ($oIfxA->SiguienteRegistro());
-                $mensaje = 'Proceso Terminado con Exito';
+                $oIfx->QueryT($sql_cdep);
             }
         }
         $oReturn->alert('Proceso Terminado con Exito');
-        //$oReturn->script("recarga();"); 
         $oIfx->QueryT('COMMIT WORK;');
+        error_log('Usuario ' . $usuario_web . ' generó depreciación desde ' . $fechaDesde->format('Y-m') . ' hasta ' . $fechaHasta->format('Y-m') . ' para ' . count($activos) . ' activos.');
     } catch (Exception $e) {
         $oCon->QueryT('ROLLBACK');
         $oReturn->alert($e->getMessage());

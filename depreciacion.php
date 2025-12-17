@@ -64,43 +64,47 @@
             document.form1.sucursal.value = i;
         }
 
-        function f_filtro_anio(data){
-            xajax_f_filtro_anio(xajax.getFormValues("form1"), data);           
+        function f_filtro_anio(target){
+            xajax_f_filtro_anio(xajax.getFormValues("form1"), target);
         }
-   
-        function eliminar_lista_anio() {
-            var sel = document.getElementById("anio");
+
+        function eliminar_lista_anio(targetId) {
+            var selectId = targetId || "anio_desde";
+            var sel = document.getElementById(selectId);
             for (var i = (sel.length - 1); i >= 1; i--) {
                 aBorrar = sel.options[i];
                 aBorrar.parentNode.removeChild(aBorrar);
             }
         }
-        
-        function anadir_elemento_anio(x, i, elemento) {
-            var lista = document.form1.anio;
+
+        function anadir_elemento_anio(x, i, elemento, targetId) {
+            var selectId = targetId || "anio_desde";
+            var lista = document.form1[selectId];
             var option = new Option(elemento, i);
             lista.options[x] = option;
-            document.form1.anio.value = i;
+            lista.value = i;
         }
 
 		
-        function f_filtro_mes(data){
-            xajax_f_filtro_mes(xajax.getFormValues("form1"), data);           
+        function f_filtro_mes(target){
+            xajax_f_filtro_mes(xajax.getFormValues("form1"), target);
         }
-   
-        function eliminar_lista_mes() {
-            var sel = document.getElementById("mes");
+
+        function eliminar_lista_mes(targetId) {
+            var selectId = targetId || "mes";
+            var sel = document.getElementById(selectId);
             for (var i = (sel.length - 1); i >= 1; i--) {
                 aBorrar = sel.options[i];
                 aBorrar.parentNode.removeChild(aBorrar);
             }
         }
-        
-        function anadir_elemento_mes(x, i, elemento) {
-            var lista = document.form1.mes;
+
+        function anadir_elemento_mes(x, i, elemento, targetId) {
+            var selectId = targetId || "mes";
+            var lista = document.form1[selectId];
             var option = new Option(elemento, i);
             lista.options[x] = option;
-            document.form1.mes.value = i;
+            lista.value = i;
         }
 		function f_filtro_grupo(data){
             xajax_f_filtro_grupo(xajax.getFormValues("form1"), data);           
@@ -275,22 +279,42 @@
                             </div>
                             <div class="col-md-3">
                                 <label for="sucursal">* Sucursal </label>
-                                <select id="sucursal" name="sucursal" class="form-control input-sm select2" onchange="f_filtro_anio(); f_filtro_grupo();"  required>
+                                <select id="sucursal" name="sucursal" class="form-control input-sm select2" onchange="f_filtro_anio('anio_desde'); f_filtro_anio('anio_hasta'); f_filtro_grupo();"  required>
                                     <option value="0">Seleccione una opcion..</option>  
                                     <?=$lista_sucu;?>                                  
                                 </select>
                             </div>
                             <div class="col-md-3">
-                                <label for="anio"> * Año </label>
-                                <select id="anio" name="anio" class="form-control input-sm select2"  onchange="f_filtro_mes();" required>
+                                <label for="anio_desde"> * Desde Año </label>
+                                <select id="anio_desde" name="anio_desde" class="form-control input-sm select2"  onchange="f_filtro_mes('mes_desde');" required>
                                     <option value="">Seleccione una opcion..</option>
                                     <?=$lista_ejer;?>
                                 </select>
                             </div>
 
                             <div class="col-md-3">
-                                <label for="mes"> Mes </label>
-                                <select id="mes" name="mes" class="form-control input-sm select2">
+                                <label for="mes_desde"> Desde Mes </label>
+                                <select id="mes_desde" name="mes_desde" class="form-control input-sm select2">
+                                    <option value="">Seleccione una opcion..</option>
+                                    <?=$lista_mes;?>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-12">
+                        <div class="form-row">
+                            <div class="col-md-3">
+                                <label for="anio_hasta"> * Hasta Año </label>
+                                <select id="anio_hasta" name="anio_hasta" class="form-control input-sm select2"  onchange="f_filtro_mes('mes_hasta');" required>
+                                    <option value="">Seleccione una opcion..</option>
+                                    <?=$lista_ejer;?>
+                                </select>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label for="mes_hasta"> Hasta Mes </label>
+                                <select id="mes_hasta" name="mes_hasta" class="form-control input-sm select2">
                                     <option value="">Seleccione una opcion..</option>
                                     <?=$lista_mes;?>
                                 </select>
