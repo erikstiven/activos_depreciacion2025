@@ -151,7 +151,6 @@
             var lista = document.form1.cod_grupo;
             var option = new Option(elemento, i);
             lista.options[x] = option;
-            document.form1.cod_grupo.value = i;
         }
 		
 		function f_filtro_subgrupo(){         
@@ -168,11 +167,7 @@
         
         function anadir_elemento_subgrupo(x, i, elemento) {
             var lista = document.form1.cod_subgrupo;
-            if(x == '1'){
-                var option = new Option(elemento, i, true,true);
-            }else{
-                var option = new Option(elemento, i);
-            }
+            var option = new Option(elemento, i);
             lista.options[x] = option;
         }
 		function f_filtro_activos_desde(){
@@ -343,16 +338,16 @@
                     </div>
                     <div class="col-md-12">
                         <div class="form-row">                            
-                            <div class="col-md-3">
+            <div class="col-md-3">
                                 <label for="cod_grupo"> Grupo </label>
-                                <select id="cod_grupo" name="cod_grupo" class="form-control input-sm select2" onchange="f_filtro_subgrupo(); f_filtro_activos_desde(); f_filtro_activos_hasta();">
+                                <select id="cod_grupo" name="cod_grupo[]" multiple class="form-control input-sm select2" onchange="f_filtro_subgrupo(); f_filtro_activos_desde(); f_filtro_activos_hasta();">
                                     <option value="0">Seleccione una opcion..</option>
                                     <?=$listaGrupo;?>
                                 </select>
                             </div>
                             <div class="col-md-3">
                                 <label for="cod_subgrupo"> Subgrupo </label>
-                                <select id="cod_subgrupo" name="cod_subgrupo" class="form-control input-sm select2" onchange="f_filtro_activos_desde();f_filtro_activos_hasta();">
+                                <select id="cod_subgrupo" name="cod_subgrupo[]" multiple class="form-control input-sm select2" onchange="f_filtro_activos_desde();f_filtro_activos_hasta();">
                                     <option value="0">Seleccione una opcion..</option>
                                     <?=$listaSubGrupo;?>
                                 </select>

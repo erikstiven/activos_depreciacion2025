@@ -118,6 +118,27 @@ function f_filtro_activos_desde($aForm)
     $sucursal = $aForm['sucursal'];
     $subgrupo = $aForm['cod_subgrupo'];
     $grupo    = $aForm['cod_grupo'];
+    if (is_array($grupo)) {
+        $grupo = array_values(array_filter($grupo, function ($item) {
+            return !empty($item) && $item !== '0';
+        }));
+    }
+    if (is_array($subgrupo)) {
+        $subgrupo = array_values(array_filter($subgrupo, function ($item) {
+            return !empty($item) && $item !== '0';
+        }));
+    }
+
+    if (is_array($grupo)) {
+        $grupo = array_values(array_filter($grupo, function ($item) {
+            return !empty($item) && $item !== '0';
+        }));
+    }
+    if (is_array($subgrupo)) {
+        $subgrupo = array_values(array_filter($subgrupo, function ($item) {
+            return !empty($item) && $item !== '0';
+        }));
+    }
     if (empty($empresa)) {
         $empresa = $idempresa;
     }
@@ -129,10 +150,20 @@ function f_filtro_activos_desde($aForm)
     if (!empty($sucursal) && $sucursal != '0') {
         $filtro .= " and act_cod_sucu = '$sucursal'";
     }
-    if (!empty($subgrupo) && $subgrupo != '0') {
-        $filtro .= " and sgac_cod_sgac  = '$subgrupo'";
-    } elseif (!empty($grupo) && $grupo != '0') {
-        $filtro .= " and sgac_cod_sgac in (select sgac_cod_sgac from saesgac where gact_cod_gact = '$grupo' and sgac_cod_empr = '$empresa')";
+    if (!empty($subgrupo)) {
+        if (is_array($subgrupo)) {
+            $valores = implode("','", $subgrupo);
+            $filtro .= " and sgac_cod_sgac  in ('$valores')";
+        } elseif ($subgrupo != '0') {
+            $filtro .= " and sgac_cod_sgac  = '$subgrupo'";
+        }
+    } elseif (!empty($grupo)) {
+        if (is_array($grupo)) {
+            $valoresGrupo = implode("','", $grupo);
+            $filtro .= " and sgac_cod_sgac in (select sgac_cod_sgac from saesgac where gact_cod_gact in ('$valoresGrupo') and sgac_cod_empr = '$empresa')";
+        } elseif ($grupo != '0') {
+            $filtro .= " and sgac_cod_sgac in (select sgac_cod_sgac from saesgac where gact_cod_gact = '$grupo' and sgac_cod_empr = '$empresa')";
+        }
     }
 
     // DATOS DEL ACTIVO
@@ -190,10 +221,20 @@ function f_filtro_activos_hasta($aForm)
     if (!empty($sucursal) && $sucursal != '0') {
         $filtro .= " and act_cod_sucu = '$sucursal'";
     }
-    if (!empty($subgrupo) && $subgrupo != '0') {
-        $filtro .= " and sgac_cod_sgac  = '$subgrupo'";
-    } elseif (!empty($grupo) && $grupo != '0') {
-        $filtro .= " and sgac_cod_sgac in (select sgac_cod_sgac from saesgac where gact_cod_gact = '$grupo' and sgac_cod_empr = '$empresa')";
+    if (!empty($subgrupo)) {
+        if (is_array($subgrupo)) {
+            $valores = implode("','", $subgrupo);
+            $filtro .= " and sgac_cod_sgac  in ('$valores')";
+        } elseif ($subgrupo != '0') {
+            $filtro .= " and sgac_cod_sgac  = '$subgrupo'";
+        }
+    } elseif (!empty($grupo)) {
+        if (is_array($grupo)) {
+            $valoresGrupo = implode("','", $grupo);
+            $filtro .= " and sgac_cod_sgac in (select sgac_cod_sgac from saesgac where gact_cod_gact in ('$valoresGrupo') and sgac_cod_empr = '$empresa')";
+        } elseif ($grupo != '0') {
+            $filtro .= " and sgac_cod_sgac in (select sgac_cod_sgac from saesgac where gact_cod_gact = '$grupo' and sgac_cod_empr = '$empresa')";
+        }
     }
 
     // DATOS DEL ACTIVO
@@ -284,6 +325,7 @@ function f_filtro_grupo($aForm, $data)
 
     $oReturn = new xajaxResponse();
     $idempresa = $_SESSION['U_EMPRESA'];
+    $idsucursal = $_SESSION['U_SUCURSAL'];
     //variables formulario
     $empresa = $aForm['empresa'];
     $sucursal = $aForm['sucursal'];
@@ -337,19 +379,33 @@ function f_filtro_subgrupo($aForm = '')
 
     $oReturn = new xajaxResponse();
     $idempresa = $_SESSION['U_EMPRESA'];
-    //variables formulario	
+    //variables formulario
     $empresa = $aForm['empresa'];
     $codigoGrupo = $aForm['cod_grupo'];
     if (empty($empresa)) {
         $empresa = $idempresa;
     }
+    if (is_array($codigoGrupo)) {
+        $codigoGrupo = array_values(array_filter($codigoGrupo, function ($item) {
+            return !empty($item) && $item !== '0';
+        }));
+    }
 
+    $filtroGrupo = '';
+    if (!empty($codigoGrupo)) {
+        if (is_array($codigoGrupo)) {
+            $valores = implode("','", $codigoGrupo);
+            $filtroGrupo = " and gact_cod_gact in ('$valores')";
+        } else {
+            $filtroGrupo = " and gact_cod_gact = '$codigoGrupo'";
+        }
+    }
 
     // DATOS DEL ACTIVO
-    $sql = "select sgac_cod_sgac, sgac_des_sgac 
-			 from saesgac where sgac_cod_empr = $empresa                                                                  
-			 and gact_cod_gact = '$codigoGrupo'
-			 order by sgac_des_sgac";
+    $sql = "select sgac_cod_sgac, sgac_des_sgac
+                         from saesgac where sgac_cod_empr = $empresa
+                         $filtroGrupo
+                         order by sgac_des_sgac";
     //echo $sql; exit;
     $i = 1;
     if ($oIfx->Query($sql)) {
@@ -416,6 +472,17 @@ function generar($aForm = '')
     $anio_hasta    = $aForm['anio_hasta'];
     $mes_hasta     = $aForm['mes_hasta'];
 
+    if (is_array($grupo)) {
+        $grupo = array_values(array_filter($grupo, function ($item) {
+            return !empty($item) && $item !== '0';
+        }));
+    }
+    if (is_array($subgrupo)) {
+        $subgrupo = array_values(array_filter($subgrupo, function ($item) {
+            return !empty($item) && $item !== '0';
+        }));
+    }
+
     if (empty($anio_desde) || empty($mes_desde) || empty($anio_hasta) || empty($mes_hasta)) {
         $oReturn->alert('Debe ingresar el rango completo de meses y años.');
         return $oReturn;
@@ -437,12 +504,26 @@ function generar($aForm = '')
     // ARMAR FILTROS
     $filtro = '';
     if (!empty($grupo)) {
-        $filtro = " and saeact.gact_cod_gact = '" . $grupo . "'";
+        if (is_array($grupo)) {
+            $valoresGrupo = implode("','", $grupo);
+            $filtro = " and saeact.gact_cod_gact in ('" . $valoresGrupo . "')";
+        } else {
+            $filtro = " and saeact.gact_cod_gact = '" . $grupo . "'";
+        }
     }
     if (!empty($subgrupo)) {
-        $filtro .= " and saeact.sgac_cod_sgac = '" . $subgrupo . "'";
+        if (is_array($subgrupo)) {
+            $valoresSub = implode("','", $subgrupo);
+            $filtro .= " and saeact.sgac_cod_sgac in ('" . $valoresSub . "')";
+        } else {
+            $filtro .= " and saeact.sgac_cod_sgac = '" . $subgrupo . "'";
+        }
     }
     if (!empty($activo_desde) && !empty($activo_hasta)) {
+        if ($activo_desde > $activo_hasta) {
+            $oReturn->alert('El rango de activos es inválido. El valor Desde debe ser menor o igual que Hasta.');
+            return $oReturn;
+        }
         $filtro .= " and act_cod_act between " . $activo_desde . " and " . $activo_hasta;
     }
 
@@ -510,6 +591,11 @@ function generar($aForm = '')
         }
     }
 
+    if (count($activos) === 0) {
+        $oReturn->alert('No se encontraron activos para los filtros seleccionados.');
+        return $oReturn;
+    }
+
     $oReturn->alert('Se procesarán ' . count($fechasProceso) . ' meses y ' . count($activos) . ' activos.');
 
     try {
@@ -566,7 +652,7 @@ function generar($aForm = '')
                                                                         and cdep_fec_depr = '$fecha_hasta'";
                 $existe = consulta_string($sql_existe, 'existe', $oIfx, 0);
 
-                if ($existe == 1) {
+                if ($existe > 0) {
                     $sql_borra = "delete from saecdep
                                                                                 where cdep_cod_acti = $codigo_activo
                                                                                 and cdep_fec_depr = '$fecha_hasta'";
@@ -575,6 +661,9 @@ function generar($aForm = '')
                 }
 
                 // GASTO DEPRECIACION
+                if (!isset($arrayValorDepre[$codigo_activo])) {
+                    throw new Exception('No existe valor mensual en saemet para el activo ' . $codigo_activo . ' en ' . $fecha_hasta . '.');
+                }
                 $valor_mesual = $arrayValorDepre[$codigo_activo];
                 if (empty($valor_mesual))  $valor_mesual = 0;
 
@@ -611,7 +700,7 @@ function generar($aForm = '')
         $oIfx->QueryT('COMMIT WORK;');
         error_log('Usuario ' . $usuario_web . ' generó depreciación desde ' . $fechaDesde->format('Y-m') . ' hasta ' . $fechaHasta->format('Y-m') . ' para ' . count($activos) . ' activos.');
     } catch (Exception $e) {
-        $oCon->QueryT('ROLLBACK');
+        $oIfx->QueryT('ROLLBACK');
         $oReturn->alert($e->getMessage());
     }
     return $oReturn;
