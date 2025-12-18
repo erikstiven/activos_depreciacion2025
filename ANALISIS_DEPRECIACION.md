@@ -31,10 +31,16 @@ La función `generar()` en `_Ajax.server.php` usa varias tablas:
 - **Reproceso del mismo mes**: si ya existe registro para el mismo activo/fecha, se elimina antes de insertar nuevamente. 【F:_Ajax.server.php†L491-L505】
 
 ### 5. Filtros aplicados
-- **empresa** y **sucursal**: se usan para fijar el contexto y se almacenan en los campos `act_cod_empr` y `act_cod_sucu` del nuevo registro. 【F:_Ajax.server.php†L371-L392】【F:_Ajax.server.php†L540-L546】
+- **empresa** y **sucursal**: la empresa sí filtra la consulta de activos, pero la sucursal solo se guarda en el insert final sin filtrar la lista de activos (riesgo de procesar activos de otras sucursales). 【F:_Ajax.server.php†L371-L392】【F:_Ajax.server.php†L454-L474】【F:_Ajax.server.php†L540-L546】
 - **grupo** y **subgrupo**: filtran la lista de activos (`saeact`) por `gact_cod_gact` y `sgac_cod_sgac`. 【F:_Ajax.server.php†L382-L419】【F:_Ajax.server.php†L454-L474】
 - **activo desde / hasta**: si ambos vienen definidos, limitan el rango de activos por código. 【F:_Ajax.server.php†L416-L419】
 - Otros parámetros (año, mes) determinan `fecha_hasta` pero no se guardan explícitamente más allá de `cdep_mes_depr`, `cdep_ani_depr` y `cdep_fec_depr`. 【F:_Ajax.server.php†L388-L405】【F:_Ajax.server.php†L540-L546】
+
+### 6. Errores detectados en el flujo actual
+- **Gasto 0 silencioso**: si falta `saemet` para un activo/mes, el proceso inserta 0 porque el `continue` está comentado; no se avisa al usuario. 【F:_Ajax.server.php†L436-L452】【F:_Ajax.server.php†L506-L510】
+- **Dependencia del mes anterior sin validar continuidad**: el acumulado toma el valor del mes previo exacto (`fechaAnterior`), por lo que si hay meses sin procesar el acumulado queda incompleto y no se alerta. 【F:_Ajax.server.php†L395-L405】【F:_Ajax.server.php†L521-L533】
+- **Sucursal no filtra datos**: aunque se captura y se almacena en `saecdep`, no restringe la consulta de activos. Esto puede generar registros para sucursales no deseadas. 【F:_Ajax.server.php†L371-L392】【F:_Ajax.server.php†L454-L474】【F:_Ajax.server.php†L540-L546】
+- **Catálogo de meses vulnerable**: el select de meses depende del cambio de año y puede quedar vacío, ocasionando errores de selección en la UI. 【F:depreciacion.php†L284-L296】
 
 ## Fase 2: Lógica base a preservar
 - Se genera **un registro en saecdep por activo y mes** solicitado. 【F:_Ajax.server.php†L491-L546】
@@ -42,7 +48,7 @@ La función `generar()` en `_Ajax.server.php` usa varias tablas:
 - **El acumulado** (`cdep_dep_acum`) toma el acumulado real del mes anterior + gasto mensual; si no hay histórico, inicia en 0 y suma el gasto del mes. 【F:_Ajax.server.php†L521-L533】
 - **Sin registro previo**: acumulado empieza desde el gasto del mes, equivalente a acumulado 0 + gasto. 【F:_Ajax.server.php†L528-L533】
 - **Reproceso**: si existe el mismo mes/activo se borra y se inserta nuevamente. 【F:_Ajax.server.php†L491-L505】
-- **Nota crítica sobre saemet faltante**: cuando no hay valor en `saemet` el proceso actual inserta gasto 0 sin advertencia (la línea `continue` está comentada). El diseño masivo debe manejar esto explícitamente para evitar acumulados erróneos. 【F:_Ajax.server.php†L506-L510】
+- **Manejo indispensable en el masivo**: cuando falte `saemet`, no se debe insertar nada y se debe informar (para revertir el “gasto 0 silencioso” actual) sin alterar la lectura directa del gasto. 【F:_Ajax.server.php†L506-L510】
 
 _Esta lógica es la que no debe romperse al implementar el proceso masivo._
 
