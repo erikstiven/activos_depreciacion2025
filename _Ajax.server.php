@@ -93,101 +93,109 @@ function f_filtro_anio($aForm, $data)
 
 function f_filtro_activos_desde($aForm)
 {
-    //Definiciones
     global $DSN, $DSN_Ifx;
     if (session_status() !== PHP_SESSION_ACTIVE) {
         session_start();
     }
-
-    $oCon = new Dbo();
-    $oCon->DSN = $DSN;
-    $oCon->Conectar();
 
     $oIfx = new Dbo();
     $oIfx->DSN = $DSN_Ifx;
     $oIfx->Conectar();
 
     $oReturn = new xajaxResponse();
-    // variables de sesion
     $idempresa = $_SESSION['U_EMPRESA'];
-    $idsucursal = $_SESSION['U_SUCURSAL'];
-    //variables formulario
+
     $empresa = $aForm['empresa'];
-    $sucursal = $aForm['sucursal'];
+    $grupo = $aForm['cod_grupo'];
     $subgrupo = $aForm['cod_subgrupo'];
+
     if (empty($empresa)) {
         $empresa = $idempresa;
     }
-    if (empty($sucursal)) {
-        $sucursal = $idsucursal;
+
+    $filtro = "";
+    if (!empty($subgrupo) && $subgrupo != '0') {
+        $filtro .= " and a.sgac_cod_sgac = '" . $subgrupo . "'";
     }
-    // DATOS DEL ACTIVO
-    $sql = "select act_cod_act, act_nom_act, act_clave_act
-			from saeact
-			where act_cod_empr = '$empresa'	
-			and sgac_cod_sgac  = '$subgrupo'
-			order by act_cod_act";
-    //echo $sql; exit;
-    $i = 1;
+    if (!empty($grupo) && $grupo != '0') {
+        $filtro .= " and sg.gact_cod_gact = '" . $grupo . "'";
+    }
+
+    $sql = "select a.act_cod_act, a.act_nom_act, a.act_clave_act
+              from saeact a
+              join saesgac sg on sg.sgac_cod_sgac = a.sgac_cod_sgac and sg.sgac_cod_empr = a.act_cod_empr
+             where a.act_cod_empr = '$empresa'
+               and a.act_ext_act = 1
+             $filtro
+             order by a.act_clave_act";
+
+    $items = [];
     if ($oIfx->Query($sql)) {
-        $oReturn->script('eliminar_lista_activo_desde();');
         if ($oIfx->NumFilas() > 0) {
             do {
-                $oReturn->script(('anadir_elemento_activo_desde(' . $i++ . ',\'' . $oIfx->f('act_cod_act') . '\', \'' . $oIfx->f('act_clave_act') . ' - ' . $oIfx->f('act_nom_act') . '\' )'));
+                $items[] = [
+                    'id'   => $oIfx->f('act_cod_act'),
+                    'text' => $oIfx->f('act_clave_act') . ' - ' . $oIfx->f('act_nom_act'),
+                ];
             } while ($oIfx->SiguienteRegistro());
         }
     }
+
+    $oReturn->script('renderActivosDesde(' . json_encode(['ok' => true, 'items' => $items]) . ');');
     return $oReturn;
 }
 
 function f_filtro_activos_hasta($aForm)
 {
-    //Definiciones
     global $DSN, $DSN_Ifx;
     if (session_status() !== PHP_SESSION_ACTIVE) {
         session_start();
     }
-
-    $oCon = new Dbo();
-    $oCon->DSN = $DSN;
-    $oCon->Conectar();
 
     $oIfx = new Dbo();
     $oIfx->DSN = $DSN_Ifx;
     $oIfx->Conectar();
 
     $oReturn = new xajaxResponse();
-
-    // variables de sesion
     $idempresa = $_SESSION['U_EMPRESA'];
-    $idsucursal = $_SESSION['U_SUCURSAL'];
-    //variables formulario
+
     $empresa = $aForm['empresa'];
-    $sucursal = $aForm['sucursal'];
+    $grupo = $aForm['cod_grupo'];
     $subgrupo = $aForm['cod_subgrupo'];
+
     if (empty($empresa)) {
         $empresa = $idempresa;
     }
-    if (empty($sucursal)) {
-        $sucursal = $idsucursal;
+
+    $filtro = "";
+    if (!empty($subgrupo) && $subgrupo != '0') {
+        $filtro .= " and a.sgac_cod_sgac = '" . $subgrupo . "'";
     }
-    // DATOS DEL ACTIVO
-    $sql = "select act_cod_act, act_nom_act, act_clave_act
-			from saeact
-			where act_cod_empr = '$empresa'		
-			and sgac_cod_sgac  = '$subgrupo'
-			order by act_cod_act";
-    //echo $sql; exit;
-    $i = 1;
+    if (!empty($grupo) && $grupo != '0') {
+        $filtro .= " and sg.gact_cod_gact = '" . $grupo . "'";
+    }
+
+    $sql = "select a.act_cod_act, a.act_nom_act, a.act_clave_act
+              from saeact a
+              join saesgac sg on sg.sgac_cod_sgac = a.sgac_cod_sgac and sg.sgac_cod_empr = a.act_cod_empr
+             where a.act_cod_empr = '$empresa'
+               and a.act_ext_act = 1
+             $filtro
+             order by a.act_clave_act";
+
+    $items = [];
     if ($oIfx->Query($sql)) {
-        $oReturn->script('eliminar_lista_activo_hasta();');
         if ($oIfx->NumFilas() > 0) {
             do {
-                $oReturn->script(('anadir_elemento_activo_hasta(' . $i++ . ',\'' . $oIfx->f('act_cod_act') . '\', \'' . $oIfx->f('act_clave_act') . ' - ' . $oIfx->f('act_nom_act') . '\' )'));
+                $items[] = [
+                    'id'   => $oIfx->f('act_cod_act'),
+                    'text' => $oIfx->f('act_clave_act') . ' - ' . $oIfx->f('act_nom_act'),
+                ];
             } while ($oIfx->SiguienteRegistro());
         }
     }
-    //$oReturn->assign('cod_activo_hasta', 'value', $data);
+
+    $oReturn->script('renderActivosHasta(' . json_encode(['ok' => true, 'items' => $items]) . ');');
     return $oReturn;
 }
 
@@ -203,37 +211,23 @@ function f_filtro_mes($aForm, $data)
     $oCon->DSN = $DSN;
     $oCon->Conectar();
 
-    $oIfx = new Dbo();
-    $oIfx->DSN = $DSN_Ifx;
-    $oIfx->Conectar();
-
     $oReturn = new xajaxResponse();
-
-    //variables formulario
-    $anio = $aForm['anio'];
-    $empresa = $_SESSION['U_EMPRESA'];
-    // DATOS DEL ACTIVO
-    $sql = "select prdo_num_prdo, prdo_nom_prdo
-			from saeprdo
-			where prdo_cod_empr = '$empresa'
-			and prdo_cod_ejer  = (select ejer_cod_ejer 
-									from saeejer 
-									where ejer_cod_empr = '$empresa' 
-									and date_part('year',ejer_fec_inil) = $anio)
-			order by prdo_num_prdo";
-    //echo $sql; exit;
-    $i = 1;
-    if ($oIfx->Query($sql)) {
-        $oReturn->script('eliminar_lista_mes();');
-        if ($oIfx->NumFilas() > 0) {
-            do {
-                $oReturn->script(('anadir_elemento_mes(' . $i++ . ',\'' . $oIfx->f('prdo_num_prdo') . '\', \'' . $oIfx->f('prdo_nom_prdo') . '\' )'));
-            } while ($oIfx->SiguienteRegistro());
-        }
-    }
-
+    $meses = [
+        ['id' => '01', 'text' => 'Enero'],
+        ['id' => '02', 'text' => 'Febrero'],
+        ['id' => '03', 'text' => 'Marzo'],
+        ['id' => '04', 'text' => 'Abril'],
+        ['id' => '05', 'text' => 'Mayo'],
+        ['id' => '06', 'text' => 'Junio'],
+        ['id' => '07', 'text' => 'Julio'],
+        ['id' => '08', 'text' => 'Agosto'],
+        ['id' => '09', 'text' => 'Septiembre'],
+        ['id' => '10', 'text' => 'Octubre'],
+        ['id' => '11', 'text' => 'Noviembre'],
+        ['id' => '12', 'text' => 'Diciembre'],
+    ];
+    $oReturn->script('renderCatalogoMeses();');
     $oReturn->assign('mes', 'value', $data);
-
     return $oReturn;
 }
 
@@ -420,6 +414,10 @@ function generar($aForm = '')
     //echo $filtro; exit;
     try {
         $oIfx->QueryT('BEGIN');
+        $warnings = [];
+        $procesados = 0;
+        $evaluados = 0;
+        $mensaje = 'Proceso terminado';
         // TIPO DE DEPRECIACION
         $sql_tipo = "select tdep_cod_tdep, tdep_tip_val 
 						from saetdep";
@@ -435,11 +433,11 @@ function generar($aForm = '')
 
         $oIfx->Free();
         // CALCULA GASTO DEPRECIACION
-        $sql = "select metd_cod_acti, metd_val_metd 
-					from saemet 
-					where metd_has_fech = '$fecha_hasta'
-					and metd_cod_empr   =  $empresa					
-					";
+        $sql = "select metd_cod_acti, metd_val_metd
+                                        from saemet
+                                        where metd_has_fech = '$fecha_hasta'
+                                        and metd_cod_empr   =  $empresa
+                                        ";
         //echo $sql; exit;		
         if ($oIfx->Query($sql)) {
             if ($oIfx->NumFilas() > 0) {
@@ -475,6 +473,7 @@ function generar($aForm = '')
         if ($oIfxA->Query($sql)) {
             if ($oIfxA->NumFilas() > 0) {
                 do {
+                    $evaluados++;
                     // LEER DATOS AVTIVO
                     $codigo_activo        =    $oIfxA->f('act_cod_act');
                     $vida_util          =    $oIfxA->f('act_vutil_act');
@@ -504,9 +503,11 @@ function generar($aForm = '')
                     }
 
                     // GASTO DEPRECIACION
-                    $valor_mesual = $arrayValorDepre[$codigo_activo];
-                    //if (empty($valor_mesual) or $valor_mesual == 0) continue;
-                    if (empty($valor_mesual))  $valor_mesual = 0;
+                    $valor_mesual = isset($arrayValorDepre[$codigo_activo]) ? $arrayValorDepre[$codigo_activo] : null;
+                    if ($valor_mesual === null || $valor_mesual === '') {
+                        $warnings[] = "No existe valor mensual en SAEMET para la fecha $fecha_hasta. Activo: $codigo_activo. Debe cargar el valor antes de generar la depreciación.";
+                        continue;
+                    }
 
                     // TIPO DE DEPRESIACION MENSUAL(M) - DIARIA (D)				
                     $intervalo = $arrayTipoDepre[$tipo_depreciacion];
@@ -544,16 +545,25 @@ function generar($aForm = '')
                                                     '$fecha_hasta',  $empresa,            $sucursal,      $valor_acumulado , 
                                                     $valor_mesual,      'PE',           '$fechaServer',    $valor_anterior)";
                     $oIfx->QueryT($sql_cdep);
+                    $procesados++;
                 } while ($oIfxA->SiguienteRegistro());
                 $mensaje = 'Proceso Terminado con Exito';
             }
         }
-        $oReturn->alert('Proceso Terminado con Exito');
-        //$oReturn->script("recarga();"); 
+        $payload = [
+            'ok' => true,
+            'mensaje' => $mensaje,
+            'warnings' => $warnings,
+            'procesados' => $procesados,
+            'evaluados' => $evaluados,
+            'mes' => $mes,
+            'anio' => $anio
+        ];
+        $oReturn->script('mostrarResultado(' . json_encode($payload) . ');');
         $oIfx->QueryT('COMMIT WORK;');
     } catch (Exception $e) {
-        $oCon->QueryT('ROLLBACK');
-        $oReturn->alert($e->getMessage());
+        $oIfx->QueryT('ROLLBACK');
+        $oReturn->script('mostrarResultado(' . json_encode(['error' => $e->getMessage()]) . ');');
     }
     return $oReturn;
 }

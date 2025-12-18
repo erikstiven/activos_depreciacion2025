@@ -15,7 +15,7 @@
     
     <!-- Theme style -->
     <link rel="stylesheet" href="<?=$_COOKIE["JIREH_COMPONENTES"]?>dist/css/AdminLTE.min.css">
-    <!--Javascript--> 
+    <!--Javascript-->
     
   
     <script src="<?=$_COOKIE["JIREH_INCLUDE"]?>js/dataTables/jquery.dataTables.min.js"></script>
@@ -26,8 +26,26 @@
 	
     <!-- Select2 -->
     <script src="<?=$_COOKIE["JIREH_COMPONENTES"]?>bower_components/select2/dist/js/select2.full.min.js"></script>
-    
+
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <script>
+        const catalogoMeses = [
+            { id: '01', text: 'Enero' },
+            { id: '02', text: 'Febrero' },
+            { id: '03', text: 'Marzo' },
+            { id: '04', text: 'Abril' },
+            { id: '05', text: 'Mayo' },
+            { id: '06', text: 'Junio' },
+            { id: '07', text: 'Julio' },
+            { id: '08', text: 'Agosto' },
+            { id: '09', text: 'Septiembre' },
+            { id: '10', text: 'Octubre' },
+            { id: '11', text: 'Noviembre' },
+            { id: '12', text: 'Diciembre' }
+        ];
+
         function generaSelect2(){
             $('.select2').select2();
         }
@@ -38,11 +56,37 @@
  
         function genera_cabecera_filtro() {
             xajax_genera_cabecera_formulario('filtro', xajax.getFormValues("form1"));
-        }		
+        }
         function generar(){
-            if(ProcesarFormulario() == true){
-                xajax_generar(xajax.getFormValues("form1"));
+            if (!validarFiltros()) {
+                return;
             }
+
+            const meses = 1;
+            const activosEstimados = $('#cod_activo_desde option').length > 0 ? $('#cod_activo_desde option').length - 1 : 0;
+            const operaciones = activosEstimados * meses;
+
+            Swal.fire({
+                icon: 'info',
+                title: 'Confirmar depreciación',
+                html: `<p><strong>Meses:</strong> ${meses}</p>` +
+                      `<p><strong>Activos (estimado):</strong> ${activosEstimados}</p>` +
+                      `<p><strong>Operaciones:</strong> ${operaciones}</p>`,
+                showCancelButton: true,
+                confirmButtonText: 'Procesar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'Procesando...',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+                    xajax_generar(xajax.getFormValues("form1"));
+                }
+            });
         }
 		
         function f_filtro_sucursal(data){
@@ -84,23 +128,18 @@
         }
 
 		
-        function f_filtro_mes(data){
-            xajax_f_filtro_mes(xajax.getFormValues("form1"), data);           
+        function f_filtro_mes(){
+            renderCatalogoMeses();
         }
    
-        function eliminar_lista_mes() {
-            var sel = document.getElementById("mes");
-            for (var i = (sel.length - 1); i >= 1; i--) {
-                aBorrar = sel.options[i];
-                aBorrar.parentNode.removeChild(aBorrar);
-            }
-        }
-        
-        function anadir_elemento_mes(x, i, elemento) {
-            var lista = document.form1.mes;
-            var option = new Option(elemento, i);
-            lista.options[x] = option;
-            document.form1.mes.value = i;
+        function renderCatalogoMeses() {
+            const $mes = $('#mes');
+            $mes.empty();
+            $mes.append(new Option('Seleccione una opcion..', ''));
+            catalogoMeses.forEach((mes) => {
+                $mes.append(new Option(mes.text, mes.id));
+            });
+            $mes.trigger('change');
         }
 		function f_filtro_grupo(data){
             xajax_f_filtro_grupo(xajax.getFormValues("form1"), data);           
@@ -154,14 +193,16 @@
             }
         }
         
-        function anadir_elemento_activo_desde(x, i, elemento) {
-            var lista = document.form1.cod_activo_desde;
-            if(x == '1'){
-                var option = new Option(elemento, i, true,true);
-            }else{
-                var option = new Option(elemento, i);
+        function renderActivosDesde(payload) {
+            const $select = $('#cod_activo_desde');
+            $select.empty();
+            $select.append(new Option('Seleccione una opcion..', ''));
+            if (payload && payload.ok && Array.isArray(payload.items)) {
+                payload.items.forEach((item) => {
+                    $select.append(new Option(item.text, item.id));
+                });
             }
-            lista.options[x] = option;
+            $select.trigger('change');
         }
 		function f_filtro_activos_hasta(data){
             xajax_f_filtro_activos_hasta(xajax.getFormValues("form1"));           
@@ -175,11 +216,73 @@
             }
         }
         
-        function anadir_elemento_activo_hasta(x, i, elemento) {
-            var lista = document.form1.cod_activo_hasta;
-            var option = new Option(elemento, i);
-            lista.options[x] = option;
-            document.form1.cod_activo_hasta.value = i;
+        function renderActivosHasta(payload) {
+            const $select = $('#cod_activo_hasta');
+            $select.empty();
+            $select.append(new Option('Seleccione una opcion..', ''));
+            if (payload && payload.ok && Array.isArray(payload.items)) {
+                payload.items.forEach((item) => {
+                    $select.append(new Option(item.text, item.id));
+                });
+            }
+            $select.trigger('change');
+        }
+
+        function validarFiltros() {
+            const empresa = $('#empresa').val();
+            const sucursal = $('#sucursal').val();
+            const anio = $('#anio').val();
+            const mes = $('#mes').val();
+
+            if (!empresa || empresa === '0') {
+                Swal.fire({ icon: 'error', title: 'Empresa requerida', text: 'Seleccione la empresa a procesar.' });
+                return false;
+            }
+            if (!sucursal || sucursal === '0') {
+                Swal.fire({ icon: 'error', title: 'Sucursal requerida', text: 'Seleccione la sucursal a procesar.' });
+                return false;
+            }
+            if (!anio) {
+                Swal.fire({ icon: 'error', title: 'Año requerido', text: 'Seleccione el año de depreciación.' });
+                return false;
+            }
+            if (!mes) {
+                Swal.fire({ icon: 'error', title: 'Mes requerido', text: 'Seleccione el mes de depreciación.' });
+                return false;
+            }
+            return true;
+        }
+
+        function mostrarResultado(payload) {
+            Swal.close();
+            if (!payload) {
+                Swal.fire({ icon: 'error', title: 'Respuesta inválida', text: 'No se pudo interpretar la respuesta del servidor.' });
+                return;
+            }
+            if (payload.error) {
+                Swal.fire({ icon: 'error', title: 'Error al procesar', text: payload.error });
+                return;
+            }
+
+            const warningHtml = (payload.warnings || []).map(w => `<li>${w}</li>`).join('');
+            const resumen = `<p><strong>Activos evaluados:</strong> ${payload.evaluados || 0}</p>` +
+                            `<p><strong>Registros generados:</strong> ${payload.procesados || 0}</p>` +
+                            `<p><strong>Mes/Año:</strong> ${payload.mes || ''}/${payload.anio || ''}</p>`;
+
+            if (warningHtml) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Proceso finalizado con advertencias',
+                    html: `${resumen}<div style="max-height:180px;overflow:auto;text-align:left;"><ul>${warningHtml}</ul></div>`
+                });
+                return;
+            }
+
+            Swal.fire({
+                icon: 'success',
+                title: payload.mensaje || 'Proceso terminado',
+                html: resumen
+            });
         }
 		
 
@@ -239,11 +342,25 @@
                                                 ejer_cod_empr = $idempresa order by 2 desc ";
                                 $lista_ejer = lista_boostrap_func($oIfx, $sql, $id_anio, 'anio',  'anio' );   
 
-                                $sql = "select prdo_num_prdo, prdo_nom_prdo from saeprdo where
-                                                prdo_cod_empr = $idempresa and
-                                                prdo_cod_ejer = $ejer_cod_ejer
-                                                order by 1 ";
-                                $lista_mes = lista_boostrap_func($oIfx, $sql, $id_mes, 'prdo_num_prdo',  'prdo_nom_prdo' );
+                                $catalogo_meses = [
+                                    '01' => 'Enero',
+                                    '02' => 'Febrero',
+                                    '03' => 'Marzo',
+                                    '04' => 'Abril',
+                                    '05' => 'Mayo',
+                                    '06' => 'Junio',
+                                    '07' => 'Julio',
+                                    '08' => 'Agosto',
+                                    '09' => 'Septiembre',
+                                    '10' => 'Octubre',
+                                    '11' => 'Noviembre',
+                                    '12' => 'Diciembre'
+                                ];
+                                $lista_mes = '';
+                                foreach ($catalogo_meses as $codMes => $nomMes) {
+                                    $selected = ($codMes == $id_mes) ? 'selected' : '';
+                                    $lista_mes .= "<option value='$codMes' $selected>$nomMes</option>";
+                                }
                                 // LISTA GRUPOS
                                 $sql = " SELECT gact_cod_gact, gact_des_gact
                                         FROM saegact
@@ -343,7 +460,7 @@
         </div>
     </body>
          
-    <script>genera_cabecera_formulario(); generaSelect2();/*genera_detalle();genera_form_detalle();*/</script> 
+    <script>genera_cabecera_formulario(); generaSelect2(); renderCatalogoMeses();/*genera_detalle();genera_form_detalle();*/</script>
     <? /*     * ***************************************************************** */ ?>
     <? /* NO MODIFICAR ESTA SECCION */ ?>
 <? } ?>
