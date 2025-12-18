@@ -62,7 +62,7 @@
                 return;
             }
 
-            const meses = 1;
+            const meses = calcularCantidadMeses();
             const activosEstimados = $('#cod_activo_desde option').length > 0 ? $('#cod_activo_desde option').length - 1 : 0;
             const operaciones = activosEstimados * meses;
 
@@ -133,16 +133,19 @@
         }
    
         function renderCatalogoMeses() {
-            const $mes = $('#mes');
-            $mes.empty();
-            $mes.append(new Option('Seleccione una opcion..', ''));
-            catalogoMeses.forEach((mes) => {
-                $mes.append(new Option(mes.text, mes.id));
+            const selects = ['#mes_desde', '#mes_hasta'];
+            selects.forEach((selector) => {
+                const $mes = $(selector);
+                $mes.empty();
+                $mes.append(new Option('Seleccione una opcion..', ''));
+                catalogoMeses.forEach((mes) => {
+                    $mes.append(new Option(mes.text, mes.id));
+                });
+                $mes.trigger('change');
             });
-            $mes.trigger('change');
         }
-		function f_filtro_grupo(data){
-            xajax_f_filtro_grupo(xajax.getFormValues("form1"), data);           
+        function f_filtro_grupo(data){
+            xajax_f_filtro_grupo(xajax.getFormValues("form1"), data);
         }
    
 		function eliminar_lista_grupo() {
@@ -160,7 +163,7 @@
             document.form1.cod_grupo.value = i;
         }
 		
-		function f_filtro_subgrupo(){         
+        function f_filtro_subgrupo(){
             xajax_f_filtro_subgrupo(xajax.getFormValues("form1"));
         }
    
@@ -231,8 +234,10 @@
         function validarFiltros() {
             const empresa = $('#empresa').val();
             const sucursal = $('#sucursal').val();
-            const anio = $('#anio').val();
-            const mes = $('#mes').val();
+            const anioDesde = $('#anio_desde').val();
+            const mesDesde = $('#mes_desde').val();
+            const anioHasta = $('#anio_hasta').val();
+            const mesHasta = $('#mes_hasta').val();
 
             if (!empresa || empresa === '0') {
                 Swal.fire({ icon: 'error', title: 'Empresa requerida', text: 'Seleccione la empresa a procesar.' });
@@ -242,15 +247,38 @@
                 Swal.fire({ icon: 'error', title: 'Sucursal requerida', text: 'Seleccione la sucursal a procesar.' });
                 return false;
             }
-            if (!anio) {
-                Swal.fire({ icon: 'error', title: 'Año requerido', text: 'Seleccione el año de depreciación.' });
+            if (!anioDesde || !mesDesde) {
+                Swal.fire({ icon: 'error', title: 'Periodo inicial requerido', text: 'Seleccione año y mes Desde.' });
                 return false;
             }
-            if (!mes) {
-                Swal.fire({ icon: 'error', title: 'Mes requerido', text: 'Seleccione el mes de depreciación.' });
+            if (!anioHasta || !mesHasta) {
+                Swal.fire({ icon: 'error', title: 'Periodo final requerido', text: 'Seleccione año y mes Hasta.' });
+                return false;
+            }
+
+            const periodoDesde = (parseInt(anioDesde, 10) * 12) + (parseInt(mesDesde, 10));
+            const periodoHasta = (parseInt(anioHasta, 10) * 12) + (parseInt(mesHasta, 10));
+
+            if (periodoDesde > periodoHasta) {
+                Swal.fire({ icon: 'error', title: 'Rango inválido', text: 'El periodo Desde no puede ser mayor al periodo Hasta.' });
                 return false;
             }
             return true;
+        }
+
+        function calcularCantidadMeses() {
+            const anioDesde = parseInt($('#anio_desde').val() || '0', 10);
+            const mesDesde = parseInt($('#mes_desde').val() || '0', 10);
+            const anioHasta = parseInt($('#anio_hasta').val() || '0', 10);
+            const mesHasta = parseInt($('#mes_hasta').val() || '0', 10);
+
+            if (!anioDesde || !mesDesde || !anioHasta || !mesHasta) {
+                return 0;
+            }
+
+            const inicio = (anioDesde * 12) + mesDesde;
+            const fin = (anioHasta * 12) + mesHasta;
+            return (fin - inicio) + 1;
         }
 
         function mostrarResultado(payload) {
@@ -267,7 +295,8 @@
             const warningHtml = (payload.warnings || []).map(w => `<li>${w}</li>`).join('');
             const resumen = `<p><strong>Activos evaluados:</strong> ${payload.evaluados || 0}</p>` +
                             `<p><strong>Registros generados:</strong> ${payload.procesados || 0}</p>` +
-                            `<p><strong>Mes/Año:</strong> ${payload.mes || ''}/${payload.anio || ''}</p>`;
+                            `<p><strong>Meses procesados:</strong> ${payload.meses || 0}</p>` +
+                            `<p><strong>Rango:</strong> ${(payload.rango && payload.rango.desde) ? payload.rango.desde : ''} a ${(payload.rango && payload.rango.hasta) ? payload.rango.hasta : ''}</p>`;
 
             if (warningHtml) {
                 Swal.fire({
@@ -370,6 +399,7 @@
                                 // LISTA SUBGRUPOS
                                 $sql = " SELECT sgac_cod_sgac, sgac_des_sgac from saesgac where sgac_cod_empr = $idempresa ";
                                 $listaSubGrupo = lista_boostrap_func($oIfx, $sql, '', 'sgac_cod_sgac',  'sgac_des_sgac' );
+                                $listaActivos = '';
                             ?>
                     </div>
                     <div class="col-md-12">
@@ -385,29 +415,44 @@
                         <div class="form-row">
                             <div class="col-md-3">
                                 <label for="empresa">* Empresa </label>
-                                <select id="empresa" name="empresa" class="form-control input-sm select2" onchange="cargar_sucu();" required>
+                                <select id="empresa" name="empresa" class="form-control input-sm select2" onchange="f_filtro_sucursal(); f_filtro_activos_desde(); f_filtro_activos_hasta();" required>
                                     <option value="0">Seleccione una opcion..</option>
                                     <?=$lista_empr;?>
                                 </select>
                             </div>
                             <div class="col-md-3">
                                 <label for="sucursal">* Sucursal </label>
-                                <select id="sucursal" name="sucursal" class="form-control input-sm select2" onchange="f_filtro_anio(); f_filtro_grupo();"  required>
+                                <select id="sucursal" name="sucursal" class="form-control input-sm select2" onchange="f_filtro_anio(); f_filtro_grupo(); f_filtro_activos_desde(); f_filtro_activos_hasta();"  required>
                                     <option value="0">Seleccione una opcion..</option>  
                                     <?=$lista_sucu;?>                                  
                                 </select>
                             </div>
                             <div class="col-md-3">
-                                <label for="anio"> * Año </label>
-                                <select id="anio" name="anio" class="form-control input-sm select2"  onchange="f_filtro_mes();" required>
+                                <label for="anio_desde"> * Año Desde </label>
+                                <select id="anio_desde" name="anio_desde" class="form-control input-sm select2"  onchange="f_filtro_mes();" required>
                                     <option value="">Seleccione una opcion..</option>
                                     <?=$lista_ejer;?>
                                 </select>
                             </div>
 
                             <div class="col-md-3">
-                                <label for="mes"> Mes </label>
-                                <select id="mes" name="mes" class="form-control input-sm select2">
+                                <label for="mes_desde"> * Mes Desde </label>
+                                <select id="mes_desde" name="mes_desde" class="form-control input-sm select2">
+                                    <option value="">Seleccione una opcion..</option>
+                                    <?=$lista_mes;?>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="anio_hasta"> * Año Hasta </label>
+                                <select id="anio_hasta" name="anio_hasta" class="form-control input-sm select2"  onchange="f_filtro_mes();" required>
+                                    <option value="">Seleccione una opcion..</option>
+                                    <?=$lista_ejer;?>
+                                </select>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label for="mes_hasta"> * Mes Hasta </label>
+                                <select id="mes_hasta" name="mes_hasta" class="form-control input-sm select2">
                                     <option value="">Seleccione una opcion..</option>
                                     <?=$lista_mes;?>
                                 </select>
@@ -418,14 +463,14 @@
                         <div class="form-row">                            
                             <div class="col-md-3">
                                 <label for="cod_grupo"> Grupo </label>
-                                <select id="cod_grupo" name="cod_grupo" class="form-control input-sm select2" onchange="f_filtro_subgrupo();">
+                                <select id="cod_grupo" name="cod_grupo[]" class="form-control input-sm select2" multiple onchange="f_filtro_subgrupo();">
                                     <option value="0">Seleccione una opcion..</option>
                                     <?=$listaGrupo;?>
                                 </select>
                             </div>
                             <div class="col-md-3">
                                 <label for="cod_subgrupo"> Subgrupo </label>
-                                <select id="cod_subgrupo" name="cod_subgrupo" class="form-control input-sm select2" onchange="f_filtro_activos_desde();f_filtro_activos_hasta();">
+                                <select id="cod_subgrupo" name="cod_subgrupo[]" class="form-control input-sm select2" multiple onchange="f_filtro_activos_desde();f_filtro_activos_hasta();">
                                     <option value="0">Seleccione una opcion..</option>
                                     <?=$listaSubGrupo;?>
                                 </select>
@@ -444,6 +489,14 @@
                                     <?=$listaActivos;?>
                                 </select>
                             </div>
+                            <div class="col-md-3">
+                                <label for="solo_vigentes"> Solo vigentes </label>
+                                <div class="checkbox" style="margin-top: 6px;">
+                                    <label>
+                                        <input type="checkbox" id="solo_vigentes" name="solo_vigentes" value="1" checked> Activos con vigencia
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                         <div class="form-row"> 
                             <div class="col-md-12">
@@ -460,7 +513,7 @@
         </div>
     </body>
          
-    <script>genera_cabecera_formulario(); generaSelect2(); renderCatalogoMeses();/*genera_detalle();genera_form_detalle();*/</script>
+    <script>genera_cabecera_formulario(); generaSelect2(); renderCatalogoMeses(); f_filtro_activos_desde(); f_filtro_activos_hasta();/*genera_detalle();genera_form_detalle();*/</script>
     <? /*     * ***************************************************************** */ ?>
     <? /* NO MODIFICAR ESTA SECCION */ ?>
 <? } ?>
