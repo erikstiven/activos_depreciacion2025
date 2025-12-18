@@ -66,11 +66,13 @@
             const meses = calcularCantidadMeses();
             const activosEstimados = 'Según filtros (se calculará en el servidor)';
             const operaciones = 'Estimación en servidor';
+            const rango = `${$('#anio_desde').val() || ''}-${$('#mes_desde').val() || ''} a ${$('#anio_hasta').val() || ''}-${$('#mes_hasta').val() || ''}`;
 
             Swal.fire({
                 icon: 'info',
                 title: 'Confirmar depreciación',
-                html: `<p><strong>Meses:</strong> ${meses}</p>` +
+                html: `<p><strong>Rango:</strong> ${rango}</p>` +
+                      `<p><strong>Meses:</strong> ${meses}</p>` +
                       `<p><strong>Activos (estimado):</strong> ${activosEstimados}</p>` +
                       `<p><strong>Operaciones:</strong> ${operaciones}</p>`,
                 showCancelButton: true,
@@ -240,9 +242,17 @@
                         if (!data) {
                             return { results: [] };
                         }
+                        const results = data.results || [];
                         if (data.ok) {
+                            if (results.length === 0 && (!params || !params.page || params.page === 1)) {
+                                Swal.fire({
+                                    icon: 'info',
+                                    title: 'Sin activos',
+                                    text: data.message || 'No se encontraron activos con los filtros seleccionados.'
+                                });
+                            }
                             return {
-                                results: data.results || [],
+                                results: results,
                                 pagination: data.pagination || { more: false }
                             };
                         }
@@ -346,16 +356,28 @@
             }
 
             const warningHtml = (payload.warnings || []).map(w => `<li>${w}</li>`).join('');
+            const warningsTotales = (payload.warnings || []).length;
+            const warningsList = warningsTotales > 20 ? (payload.warnings || []).slice(0, 20) : (payload.warnings || []);
+            const warningHtmlLimitado = warningsList.map(w => `<li>${w}</li>`).join('');
             const resumen = `<p><strong>Activos evaluados:</strong> ${payload.evaluados || 0}</p>` +
                             `<p><strong>Registros generados:</strong> ${payload.procesados || 0}</p>` +
                             `<p><strong>Meses procesados:</strong> ${payload.meses || 0}</p>` +
                             `<p><strong>Rango:</strong> ${(payload.rango && payload.rango.desde) ? payload.rango.desde : ''} a ${(payload.rango && payload.rango.hasta) ? payload.rango.hasta : ''}</p>`;
 
+            if (payload.procesados === 0 && (!payload.evaluados || payload.evaluados === 0) && !warningHtml) {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Sin resultados',
+                    html: resumen + '<p>No se encontraron activos con los filtros seleccionados.</p>'
+                });
+                return;
+            }
+
             if (warningHtml) {
                 Swal.fire({
                     icon: 'warning',
                     title: 'Proceso finalizado con advertencias',
-                    html: `${resumen}<div style="max-height:180px;overflow:auto;text-align:left;"><ul>${warningHtml}</ul></div>`
+                    html: `${resumen}<div style="max-height:180px;overflow:auto;text-align:left;"><ul>${warningHtmlLimitado}</ul></div>${warningsTotales > 20 ? `<p>... y ${warningsTotales - 20} más</p>` : ''}`
                 });
                 return;
             }

@@ -88,6 +88,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_activos_rango') {
         'ok' => true,
         'results' => $results,
         'pagination' => ['more' => $tieneMas],
+        'message' => empty($results) ? 'No se encontraron activos con los filtros seleccionados.' : '',
     ]);
     exit;
 }
@@ -157,6 +158,7 @@ function f_filtro_anio($aForm, $data)
 
     $oReturn = new xajaxResponse();
     $idempresa = $_SESSION['U_EMPRESA'];
+    $idsucursal = isset($_SESSION['U_SUCURSAL']) ? $_SESSION['U_SUCURSAL'] : null;
     //variables formulario
     $empresa = $aForm['empresa'];
     if (empty($empresa)) {
@@ -515,6 +517,11 @@ function generar($aForm = '')
         $sucursal = $idsucursal;
     }
 
+    if (empty($empresa) || empty($sucursal)) {
+        $oReturn->script('mostrarResultado(' . json_encode(['error' => 'Debe seleccionar empresa y sucursal para procesar.']) . ');');
+        return $oReturn;
+    }
+
     $gruposFiltro = [];
     if (!empty($grupos)) {
         $gruposFiltro = is_array($grupos) ? $grupos : [$grupos];
@@ -548,6 +555,19 @@ function generar($aForm = '')
     $evaluados = 0;
     $warnings = [];
     $mesesProcesados = 0;
+
+    if (empty($anioDesde) || empty($mesDesde) || empty($anioHasta) || empty($mesHasta)) {
+        $oReturn->script('mostrarResultado(' . json_encode(['error' => 'Debe seleccionar periodo Desde y Hasta.']) . ');');
+        return $oReturn;
+    }
+
+    $periodoDesde = ($anioDesde * 12) + $mesDesde;
+    $periodoHasta = ($anioHasta * 12) + $mesHasta;
+
+    if ($periodoDesde > $periodoHasta) {
+        $oReturn->script('mostrarResultado(' . json_encode(['error' => 'El periodo Desde no puede ser mayor al periodo Hasta.']) . ');');
+        return $oReturn;
+    }
 
     try {
         $inicio = new DateTime(sprintf('%04d-%02d-01', $anioDesde, $mesDesde));
@@ -673,6 +693,11 @@ function generar($aForm = '')
                 'hasta' => sprintf('%04d-%02d', $anioHasta, $mesHasta),
             ],
         ];
+
+        if ($evaluados === 0 && empty($warnings)) {
+            $payload['error'] = 'No se encontraron activos con los filtros seleccionados.';
+        }
+
         $oReturn->script('mostrarResultado(' . json_encode($payload) . ');');
     } catch (Exception $e) {
         $oIfx->QueryT('ROLLBACK');
