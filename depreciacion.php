@@ -47,7 +47,8 @@
         ];
 
         function generaSelect2(){
-            $('.select2').select2();
+            $('.select2').not('#cod_activo_desde, #cod_activo_hasta').select2();
+            inicializarSelect2Activos();
         }
         function genera_cabecera_formulario() {
             xajax_genera_cabecera_formulario('nuevo', xajax.getFormValues("form1"));
@@ -63,8 +64,8 @@
             }
 
             const meses = calcularCantidadMeses();
-            const activosEstimados = $('#cod_activo_desde option').length > 0 ? $('#cod_activo_desde option').length - 1 : 0;
-            const operaciones = activosEstimados * meses;
+            const activosEstimados = 'Según filtros (se calculará en el servidor)';
+            const operaciones = 'Estimación en servidor';
 
             Swal.fire({
                 icon: 'info',
@@ -184,51 +185,95 @@
             }
             lista.options[x] = option;
         }
-		function f_filtro_activos_desde(){
-            xajax_f_filtro_activos_desde(xajax.getFormValues("form1"));           
+        function limpiarSelectActivos() {
+            $('#cod_activo_desde').val(null).trigger('change');
+            $('#cod_activo_hasta').val(null).trigger('change');
         }
-   
-		function eliminar_lista_activo_desde() {
-            var sel = document.getElementById("cod_activo_desde");
-            for (var i = (sel.length - 1); i >= 1; i--) {
-                aBorrar = sel.options[i];
-                aBorrar.parentNode.removeChild(aBorrar);
-            }
+        function f_filtro_activos_desde(){
+            limpiarSelectActivos();
         }
-        
-        function renderActivosDesde(payload) {
-            const $select = $('#cod_activo_desde');
-            $select.empty();
-            $select.append(new Option('Seleccione una opcion..', ''));
-            if (payload && payload.ok && Array.isArray(payload.items)) {
-                payload.items.forEach((item) => {
-                    $select.append(new Option(item.text, item.id));
-                });
-            }
-            $select.trigger('change');
+        function f_filtro_activos_hasta(data){
+            limpiarSelectActivos();
         }
-		function f_filtro_activos_hasta(data){
-            xajax_f_filtro_activos_hasta(xajax.getFormValues("form1"));           
-        }
-   
-		function eliminar_lista_activo_hasta() {
-            var sel = document.getElementById("cod_activo_hasta");
-            for (var i = (sel.length - 1); i >= 1; i--) {
-                aBorrar = sel.options[i];
-                aBorrar.parentNode.removeChild(aBorrar);
-            }
-        }
-        
-        function renderActivosHasta(payload) {
-            const $select = $('#cod_activo_hasta');
-            $select.empty();
-            $select.append(new Option('Seleccione una opcion..', ''));
-            if (payload && payload.ok && Array.isArray(payload.items)) {
-                payload.items.forEach((item) => {
-                    $select.append(new Option(item.text, item.id));
-                });
-            }
-            $select.trigger('change');
+        function inicializarSelect2Activos() {
+            const requiereContexto = (e) => {
+                const empresa = $('#empresa').val();
+                const sucursal = $('#sucursal').val();
+                if (!empresa || empresa === '0' || !sucursal || sucursal === '0') {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Seleccione empresa y sucursal',
+                        text: 'Debe escoger Empresa y Sucursal antes de buscar activos.'
+                    });
+                    e.preventDefault();
+                    return true;
+                }
+                return false;
+            };
+
+            const baseConfig = {
+                width: '100%',
+                placeholder: 'Seleccione una opción..',
+                allowClear: true,
+                ajax: {
+                    url: '_Ajax.server.php',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) {
+                        const empresa = $('#empresa').val();
+                        const sucursal = $('#sucursal').val();
+                        if (!empresa || empresa === '0' || !sucursal || sucursal === '0') {
+                            return false;
+                        }
+                        return {
+                            action: 'get_activos_rango',
+                            empresa: empresa,
+                            sucursal: sucursal,
+                            grupos: $('#cod_grupo').val() || [],
+                            subgrupos: $('#cod_subgrupo').val() || [],
+                            solo_vigentes: $('#solo_vigentes').is(':checked') ? 1 : 0,
+                            q: params.term || '',
+                            page: params.page || 1
+                        };
+                    },
+                    processResults: function (data, params) {
+                        if (!data) {
+                            return { results: [] };
+                        }
+                        if (data.ok) {
+                            return {
+                                results: data.results || [],
+                                pagination: data.pagination || { more: false }
+                            };
+                        }
+                        Swal.fire({
+                            icon: 'info',
+                            title: 'Sin activos',
+                            text: data.message || 'No se encontraron activos con los filtros seleccionados.'
+                        });
+                        return { results: [] };
+                    },
+                    error: function () {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error al cargar activos',
+                            text: 'Revise la conexión o contacte al administrador.'
+                        });
+                    }
+                },
+                language: {
+                    noResults: function () {
+                        return 'Sin resultados';
+                    }
+                }
+            };
+
+            $('#cod_activo_desde').select2(baseConfig).on('select2:opening', function (e) {
+                requiereContexto(e);
+            });
+            $('#cod_activo_hasta').select2(baseConfig).on('select2:opening', function (e) {
+                requiereContexto(e);
+            });
         }
 
         function validarFiltros() {
@@ -238,6 +283,8 @@
             const mesDesde = $('#mes_desde').val();
             const anioHasta = $('#anio_hasta').val();
             const mesHasta = $('#mes_hasta').val();
+            const activoDesde = $('#cod_activo_desde').val();
+            const activoHasta = $('#cod_activo_hasta').val();
 
             if (!empresa || empresa === '0') {
                 Swal.fire({ icon: 'error', title: 'Empresa requerida', text: 'Seleccione la empresa a procesar.' });
@@ -262,6 +309,12 @@
             if (periodoDesde > periodoHasta) {
                 Swal.fire({ icon: 'error', title: 'Rango inválido', text: 'El periodo Desde no puede ser mayor al periodo Hasta.' });
                 return false;
+            }
+            if (activoDesde && activoDesde !== '0' && activoHasta && activoHasta !== '0') {
+                if (activoDesde > activoHasta) {
+                    Swal.fire({ icon: 'error', title: 'Rango de activos inválido', text: 'El activo Desde no puede ser mayor al activo Hasta.' });
+                    return false;
+                }
             }
             return true;
         }

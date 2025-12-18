@@ -1,6 +1,96 @@
 <?php
 
 require("_Ajax.comun.php"); // No modificar esta linea
+
+if (isset($_GET['action']) && $_GET['action'] === 'get_activos_rango') {
+    header('Content-Type: application/json');
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_start();
+    }
+
+    global $DSN_Ifx;
+    $oIfx = new Dbo();
+    $oIfx->DSN = $DSN_Ifx;
+    $oIfx->Conectar();
+
+    $empresa = isset($_GET['empresa']) ? (int) $_GET['empresa'] : 0;
+    $sucursal = isset($_GET['sucursal']) ? (int) $_GET['sucursal'] : 0;
+    $soloVigentes = isset($_GET['solo_vigentes']) && (int) $_GET['solo_vigentes'] === 1;
+    $grupos = isset($_GET['grupos']) ? $_GET['grupos'] : [];
+    $subgrupos = isset($_GET['subgrupos']) ? $_GET['subgrupos'] : [];
+    $termino = isset($_GET['q']) ? trim($_GET['q']) : '';
+    $page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+    if ($page < 1) {
+        $page = 1;
+    }
+
+    $pageSize = 30;
+    $offset = ($page - 1) * $pageSize;
+
+    if (!$empresa || !$sucursal) {
+        echo json_encode([
+            'ok' => false,
+            'message' => 'Seleccione empresa y sucursal para cargar los activos.',
+            'results' => [],
+        ]);
+        exit;
+    }
+
+    $gruposFiltro = is_array($grupos) ? $grupos : [$grupos];
+    $gruposFiltro = array_filter($gruposFiltro, function ($val) {
+        return $val !== '' && $val !== '0';
+    });
+
+    $subgruposFiltro = is_array($subgrupos) ? $subgrupos : [$subgrupos];
+    $subgruposFiltro = array_filter($subgruposFiltro, function ($val) {
+        return $val !== '' && $val !== '0';
+    });
+
+    $filtro = " where a.act_cod_empr = $empresa";
+    $filtro .= " and a.act_cod_sucu = $sucursal";
+    if ($soloVigentes) {
+        $filtro .= " and a.act_ext_act = 1";
+    }
+    if (!empty($gruposFiltro)) {
+        $filtro .= " and sg.gact_cod_gact in ('" . implode("','", array_map('addslashes', $gruposFiltro)) . "')";
+    }
+    if (!empty($subgruposFiltro)) {
+        $filtro .= " and sg.sgac_cod_sgac in ('" . implode("','", array_map('addslashes', $subgruposFiltro)) . "')";
+    }
+    if ($termino !== '') {
+        $terminoLimpio = addslashes(strtoupper($termino));
+        $filtro .= " and (".
+            " upper(cast(a.act_cod_act as varchar(50))) like '%$terminoLimpio%'".
+            " or upper(a.act_clave_act) like '%$terminoLimpio%'".
+            " or upper(a.act_nom_act) like '%$terminoLimpio%')";
+    }
+
+    $sql = "select first $pageSize skip $offset a.act_cod_act, a.act_nom_act, a.act_clave_act".
+           " from saeact a".
+           " join saesgac sg on sg.sgac_cod_sgac = a.sgac_cod_sgac and sg.sgac_cod_empr = a.act_cod_empr".
+           $filtro.
+           " order by a.act_clave_act";
+
+    $results = [];
+    if ($oIfx->Query($sql)) {
+        if ($oIfx->NumFilas() > 0) {
+            do {
+                $results[] = [
+                    'id' => $oIfx->f('act_cod_act'),
+                    'text' => $oIfx->f('act_clave_act') . ' - ' . $oIfx->f('act_nom_act'),
+                ];
+            } while ($oIfx->SiguienteRegistro());
+        }
+    }
+
+    $tieneMas = count($results) === $pageSize;
+    echo json_encode([
+        'ok' => true,
+        'results' => $results,
+        'pagination' => ['more' => $tieneMas],
+    ]);
+    exit;
+}
 /* :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
   // S E R V I D O R   A J A X //
   :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: */
@@ -291,17 +381,16 @@ function f_filtro_grupo($aForm, $data)
     //variables formulario
     $empresa = $aForm['empresa'];
     $sucursal = $aForm['sucursal'];
+    $anioDesde = isset($aForm['anio_desde']) ? $aForm['anio_desde'] : null;
+    $mesDesde = isset($aForm['mes_desde']) ? $aForm['mes_desde'] : null;
+    $anioHasta = isset($aForm['anio_hasta']) ? $aForm['anio_hasta'] : null;
+    $mesHasta = isset($aForm['mes_hasta']) ? $aForm['mes_hasta'] : null;
 
     if (empty($empresa)) {
         $empresa = $idempresa;
     }
     if (empty($sucursal)) {
         $sucursal = $idsucursal;
-    }
-
-    if (empty($anioDesde) || empty($mesDesde) || empty($anioHasta) || empty($mesHasta)) {
-        $oReturn->script('mostrarResultado(' . json_encode(['error' => 'Faltan parámetros de periodo para procesar la depreciación masiva.']) . ');');
-        return $oReturn;
     }
 
     // DATOS DEL GRUPO POR EMPRESA
@@ -477,13 +566,17 @@ function generar($aForm = '')
 
             $filtro = "";
             if (!empty($gruposFiltro)) {
-                $filtro .= " and saeact.gact_cod_gact in ('" . implode("','", $gruposFiltro) . "')";
+                $filtro .= " and saesgac.gact_cod_gact in ('" . implode("','", $gruposFiltro) . "')";
             }
             if (!empty($subgruposFiltro)) {
-                $filtro .= " and saeact.sgac_cod_sgac in ('" . implode("','", $subgruposFiltro) . "')";
+                $filtro .= " and saesgac.sgac_cod_sgac in ('" . implode("','", $subgruposFiltro) . "')";
             }
             if (!empty($activo_desde) && $activo_desde != '0' && !empty($activo_hasta) && $activo_hasta != '0') {
-                $filtro .= " and saeact.act_cod_act between " . (int) $activo_desde . " and " . (int) $activo_hasta;
+                $filtro .= " and saeact.act_cod_act between '" . addslashes($activo_desde) . "' and '" . addslashes($activo_hasta) . "'";
+            } elseif (!empty($activo_desde) && $activo_desde != '0') {
+                $filtro .= " and saeact.act_cod_act >= '" . addslashes($activo_desde) . "'";
+            } elseif (!empty($activo_hasta) && $activo_hasta != '0') {
+                $filtro .= " and saeact.act_cod_act <= '" . addslashes($activo_hasta) . "'";
             }
             if (!empty($sucursal) && $sucursal != '0') {
                 $filtro .= " and saeact.act_cod_sucu = '" . $sucursal . "'";
@@ -559,6 +652,8 @@ function generar($aForm = '')
                         $oIfx->QueryT($sql_cdep);
                         $procesados++;
                     } while ($oIfxA->SiguienteRegistro());
+                } else {
+                    $warnings[] = "No se encontraron activos para procesar en $fecha_hasta con los filtros seleccionados.";
                 }
             }
             $oIfx->QueryT('COMMIT WORK;');
