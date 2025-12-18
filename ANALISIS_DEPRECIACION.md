@@ -25,7 +25,7 @@ La función `generar()` en `_Ajax.server.php` usa varias tablas:
 
 ### 4. Qué significa "generar depreciación"
 - **Inserción en saecdep**: se inserta `cdep_cod_acti`, `cdep_cod_tdep`, `cdep_mes_depr`, `cdep_ani_depr`, `cdep_fec_depr`, `act_cod_empr`, `act_cod_sucu`, `cdep_dep_acum`, `cdep_gas_depn`, `cdep_est_cdep`, `cdep_fec_cdep`, `cdep_val_rep1`. 【F:_Ajax.server.php†L540-L546】
-- **Valores desde saemet**: el gasto mensual (`cdep_gas_depn`) se obtiene de `metd_val_metd` para el activo y la fecha seleccionada. 【F:_Ajax.server.php†L436-L452】【F:_Ajax.server.php†L506-L510】
+- **Valores desde saemet**: el gasto mensual (`cdep_gas_depn`) se obtiene de `metd_val_metd` para el activo y la fecha seleccionada. Si no existe registro en `saemet`, el código actual coloca 0 sin avisar porque el `continue` está comentado y se asigna 0 cuando el arreglo no tiene entrada. 【F:_Ajax.server.php†L436-L452】【F:_Ajax.server.php†L506-L510】
 - **Cálculo del acumulado**: busca la suma de `cdep_dep_acum + cdep_gas_depn` del mes anterior en `saecdep`; si no hay valor previo, el acumulado arranca con el valor mensual y `cdep_val_rep1` se fija en 0. 【F:_Ajax.server.php†L521-L533】【F:_Ajax.server.php†L540-L546】
 - **Ausencia de mes anterior**: si no existe registro previo, el acumulado parte en cero (se asigna el gasto mensual como acumulado). 【F:_Ajax.server.php†L528-L533】
 - **Reproceso del mismo mes**: si ya existe registro para el mismo activo/fecha, se elimina antes de insertar nuevamente. 【F:_Ajax.server.php†L491-L505】
@@ -42,6 +42,7 @@ La función `generar()` en `_Ajax.server.php` usa varias tablas:
 - **El acumulado** (`cdep_dep_acum`) toma el acumulado real del mes anterior + gasto mensual; si no hay histórico, inicia en 0 y suma el gasto del mes. 【F:_Ajax.server.php†L521-L533】
 - **Sin registro previo**: acumulado empieza desde el gasto del mes, equivalente a acumulado 0 + gasto. 【F:_Ajax.server.php†L528-L533】
 - **Reproceso**: si existe el mismo mes/activo se borra y se inserta nuevamente. 【F:_Ajax.server.php†L491-L505】
+- **Nota crítica sobre saemet faltante**: cuando no hay valor en `saemet` el proceso actual inserta gasto 0 sin advertencia (la línea `continue` está comentada). El diseño masivo debe manejar esto explícitamente para evitar acumulados erróneos. 【F:_Ajax.server.php†L506-L510】
 
 _Esta lógica es la que no debe romperse al implementar el proceso masivo._
 
@@ -59,7 +60,7 @@ _Esta lógica es la que no debe romperse al implementar el proceso masivo._
 4. **Resultado esperado**: la ejecución masiva debe producir exactamente los mismos registros que ejecutar manualmente mes por mes el módulo actual.
 
 ## Fase 4: UI y validaciones para el módulo masivo
-- **Selects**: asegurar carga AJAX de Activo Desde/Hasta y preservar catálogo de meses estático para evitar que desaparezcan al cambiar el año.
+- **Selects**: asegurar carga AJAX de Activo Desde/Hasta y preservar catálogo de meses estático para evitar que desaparezcan al cambiar el año. El select de meses debe ser un catálogo fijo de 12 valores y no depender de la consulta de ejercicios para evitar vacíos al cambiar de año. 【F:depreciacion.php†L284-L296】
 - **Endpoints AJAX necesarios** (parámetros):
   - `f_filtro_sucursal(empresa)`.
   - `f_filtro_anio(empresa)`.
@@ -70,7 +71,7 @@ _Esta lógica es la que no debe romperse al implementar el proceso masivo._
 - **Validaciones**:
   - Rango de meses: Desde <= Hasta (comparando año/mes).
   - Confirmación previa mostrando cantidad total de meses x activos a procesar.
-- **Mensajería**: si falta gasto en `saemet` para algún activo/mes, mostrar error específico y no generar registro vacío.
+- **Mensajería**: si falta gasto en `saemet` para algún activo/mes, mostrar error específico y no generar registro vacío (corrigiendo el comportamiento actual que inserta gasto 0 en silencio). 【F:_Ajax.server.php†L506-L510】
 
 ## Cambios necesarios (diseño)
 ### Backend (PHP)
