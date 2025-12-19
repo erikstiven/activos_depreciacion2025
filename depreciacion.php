@@ -375,6 +375,12 @@
                                 </div>
                             </div>
                             <div class="col-md-2">
+                                <label for="generar_mensual">Generar depreciación nueva para meses sin datos</label>
+                                <div>
+                                    <input type="checkbox" id="generar_mensual" name="generar_mensual" value="1">
+                                </div>
+                            </div>
+                            <div class="col-md-2">
                                 <label for="anio_desde">* Año Desde </label>
                                 <select id="anio_desde" name="anio_desde" class="form-control input-sm select2" required>
                                     <option value="">Seleccione una opcion..</option>

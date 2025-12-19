@@ -196,6 +196,8 @@ function f_filtro_activos_desde($aForm)
     $grupo = normalizar_lista($aForm['cod_grupo']);
     $subgrupo = normalizar_lista($aForm['cod_subgrupo']);
     $solo_vigentes = !empty($aForm['solo_vigentes']) ? 1 : 0;
+    $generar_mensual = !empty($aForm['generar_mensual']) ? 1 : 0;
+    $generar_mensual = !empty($aForm['generar_mensual']) ? 1 : 0;
     if (empty($empresa)) {
         $empresa = $idempresa;
     }
@@ -208,11 +210,16 @@ function f_filtro_activos_desde($aForm)
         return $oReturn;
     }
     // DATOS DEL ACTIVO
+    $filtro_grupo = '';
+    if (!empty($grupo)) {
+        $filtro_grupo = " and gact_cod_gact in (" . lista_sql($grupo) . ")";
+    }
     $sql = "select distinct act_cod_act, act_nom_act, act_clave_act
 			from saeact
 			where act_cod_empr = '$empresa'
             and act_cod_sucu = '$sucursal'
 			and sgac_cod_sgac in (" . lista_sql($subgrupo) . ")
+            $filtro_grupo
             and ($solo_vigentes = 0 or act_ext_act = 1)
 			order by act_cod_act";
     //echo $sql; exit;
@@ -501,6 +508,7 @@ function prevalidar_depreciacion($aForm = '')
     if ($solo_vigentes == 1) {
         $filtro_activo .= " and act_ext_act = 1";
     }
+    $filtro_activo .= " and act_cod_sucu = $sucursal";
 
     $sql_activos = "select count(distinct act_cod_act) as total
         from saeact
@@ -522,13 +530,14 @@ function prevalidar_depreciacion($aForm = '')
     $periodo_inicio = formatear_periodo($anio_desde, $mes_desde);
     $periodo_fin = formatear_periodo($anio_hasta, $mes_hasta);
 
+    $operacion = $generar_mensual == 1 ? 'Completar y Recalcular depreciaciones' : 'Reprocesar depreciaciones existentes';
     $oReturn->script("Swal.fire({
         title: 'Confirmar depreciación masiva',
         html: '<div style=\"text-align:left;\">' +
               '<div><strong>Rango:</strong> {$periodo_inicio} a {$periodo_fin}</div>' +
               '<div><strong>Meses a procesar:</strong> {$meses_procesar}</div>' +
               '<div><strong>Activos:</strong> {$total_activos}</div>' +
-              '<div><strong>Operación:</strong> Recalcular / Generar depreciaciones</div>' +
+              '<div><strong>Operación:</strong> {$operacion}</div>' +
               '</div>',
         showCancelButton: true,
         confirmButtonText: 'Procesar',
@@ -678,13 +687,15 @@ function generar($aForm = '')
     $registros_generados = 0;
     $registros_reprocesados = 0;
     $meses_omitidos = 0;
+    $valores_mensuales_creados = 0;
 
     $meses_procesados = calcular_meses($anio_desde, $mes_desde, $anio_hasta, $mes_hasta);
     $periodo_inicio = formatear_periodo($anio_desde, $mes_desde);
     $periodo_fin = formatear_periodo($anio_hasta, $mes_hasta);
 
-    $fecha_desde = DateTime::createFromFormat('Y-n-j', $anio_desde . '-' . $mes_desde . '-1')->format('Y-m-d');
+    $fecha_desde_obj = DateTime::createFromFormat('Y-n-j', $anio_desde . '-' . $mes_desde . '-1');
     $fecha_hasta_obj = DateTime::createFromFormat('Y-n-j', $anio_hasta . '-' . $mes_hasta . '-1');
+    $fecha_desde = $fecha_desde_obj->format('Y-m-d');
     $fecha_hasta_obj->modify('last day of this month');
     $fecha_hasta = $fecha_hasta_obj->format('Y-m-d');
 
@@ -692,47 +703,21 @@ function generar($aForm = '')
         $oIfx->QueryT('BEGIN');
         $oIfx->Free();
 
-        $sql_base = "SELECT
-            a.act_cod_act,
-            a.act_clave_act,
-            a.gact_cod_gact,
-            a.sgac_cod_sgac,
-            a.tdep_cod_tdep,
-            m.fecha_mes,
-            m.anio,
-            m.mes,
-            sm.metd_val_metd AS valor_mensual,
-            sd.cdep_cod_acti AS existe_depreciacion
-        FROM (
-            SELECT
+        $sql_activos = "SELECT distinct
                 act_cod_act,
                 act_clave_act,
                 gact_cod_gact,
                 sgac_cod_sgac,
-                tdep_cod_tdep
+                tdep_cod_tdep,
+                act_vutil_act,
+                act_val_comp,
+                act_vres_act
             FROM saeact
             WHERE act_cod_empr = $empresa
             $filtro_activo
-        ) a
-        CROSS JOIN (
-            SELECT DISTINCT
-                metd_has_fech AS fecha_mes,
-                met_anio_met  AS anio,
-                EXTRACT(MONTH FROM metd_has_fech)::int AS mes
-            FROM saemet
-            WHERE metd_has_fech BETWEEN '$fecha_desde' AND '$fecha_hasta'
-        ) m
-        LEFT JOIN saemet sm
-               ON sm.metd_cod_acti = a.act_cod_act
-              AND sm.metd_has_fech = m.fecha_mes
-              AND sm.metd_cod_empr  = $empresa
-        LEFT JOIN saecdep sd
-               ON sd.cdep_cod_acti = a.act_cod_act
-              AND sd.cdep_fec_depr = m.fecha_mes
-              AND sd.act_cod_empr  = $empresa
-        ORDER BY a.act_cod_act, m.fecha_mes";
+            ORDER BY act_cod_act";
 
-        if (!$oIfxA->Query($sql_base) || $oIfxA->NumFilas() == 0) {
+        if (!$oIfxA->Query($sql_activos) || $oIfxA->NumFilas() == 0) {
             $oIfx->QueryT('ROLLBACK');
             $oReturn->script("Swal.fire({
                 position: 'center',
@@ -744,56 +729,136 @@ function generar($aForm = '')
             return $oReturn;
         }
 
+        $activos = array();
         do {
-            $codigo_activo = $oIfxA->f('act_cod_act');
-            $clave_activo = $oIfxA->f('act_clave_act');
-            $fecha_mes = $oIfxA->f('fecha_mes');
-            $anio = (int)$oIfxA->f('anio');
-            $mes = (int)$oIfxA->f('mes');
-            $valor_mensual = $oIfxA->f('valor_mensual');
-            $existe_depreciacion = $oIfxA->f('existe_depreciacion');
-            $tipo_depreciacion = $oIfxA->f('tdep_cod_tdep');
-            $periodo_mes = formatear_periodo($anio, $mes);
+            $activos[] = array(
+                'codigo' => $oIfxA->f('act_cod_act'),
+                'clave' => $oIfxA->f('act_clave_act'),
+                'tipo_dep' => $oIfxA->f('tdep_cod_tdep'),
+                'vida_util' => $oIfxA->f('act_vutil_act'),
+                'valor_compra' => $oIfxA->f('act_val_comp'),
+                'valor_residual' => $oIfxA->f('act_vres_act')
+            );
+        } while ($oIfxA->SiguienteRegistro());
 
-            if (empty($valor_mensual) || $valor_mensual == 0) {
-                $meses_omitidos++;
-                $warnings[] = "No se generó depreciación para el activo {$clave_activo} en {$periodo_mes} porque no existe valor mensual en saemet.";
-                continue;
-            }
+        $meses = array();
+        $cursor = clone $fecha_desde_obj;
+        while ($cursor <= $fecha_hasta_obj) {
+            $meses[] = array(
+                'anio' => (int)$cursor->format('Y'),
+                'mes' => (int)$cursor->format('n'),
+                'fecha_inicio' => $cursor->format('Y-m-01'),
+                'fecha_fin' => $cursor->format('Y-m-t')
+            );
+            $cursor->modify('+1 month');
+        }
 
-            $fechaAnterior = (new DateTime($fecha_mes))->modify('last day of previous month')->format('Y-m-d');
+        foreach ($activos as $activo) {
+            foreach ($meses as $mes_info) {
+                $codigo_activo = $activo['codigo'];
+                $clave_activo = $activo['clave'];
+                $tipo_depreciacion = $activo['tipo_dep'];
+                $anio = $mes_info['anio'];
+                $mes = $mes_info['mes'];
+                $fecha_mes = $mes_info['fecha_fin'];
+                $periodo_mes = formatear_periodo($anio, $mes);
 
-            if (!empty($existe_depreciacion)) {
-                $sql_borra = "delete from saecdep
+                $sql_valor = "select metd_val_metd
+                    from saemet
+                    where metd_cod_acti = $codigo_activo
+                    and metd_has_fech = '$fecha_mes'
+                    and act_cod_empr = $empresa";
+                $valor_mensual = consulta_string($sql_valor, 'metd_val_metd', $oIfx, 0);
+
+                if (empty($valor_mensual) || $valor_mensual == 0) {
+                    if ($generar_mensual == 1) {
+                        $vida_util = (float)$activo['vida_util'];
+                        $valor_compra = (float)$activo['valor_compra'];
+                        $valor_residual = (float)$activo['valor_residual'];
+                        $vida_util_meses = $vida_util * 12;
+                        if ($vida_util_meses <= 0 || $valor_compra <= 0) {
+                            $meses_omitidos++;
+                            $warnings[] = "No se generó valor mensual para el activo {$clave_activo} en {$periodo_mes} porque no tiene vida útil o valor de compra.";
+                            continue;
+                        }
+                        $valor_mensual = ($valor_compra - $valor_residual) / $vida_util_meses;
+                        if ($valor_mensual <= 0) {
+                            $meses_omitidos++;
+                            $warnings[] = "No se generó valor mensual para el activo {$clave_activo} en {$periodo_mes} porque el cálculo resultó en cero.";
+                            continue;
+                        }
+
+                        $sql_insert_met = "INSERT INTO saemet (
+                            met_anio_met,
+                            metd_des_fech,
+                            metd_has_fech,
+                            metd_cod_empr,
+                            metd_cod_acti,
+                            act_cod_empr,
+                            act_cod_sucu,
+                            metd_val_metd
+                        ) VALUES (
+                            $anio,
+                            '{$mes_info['fecha_inicio']}',
+                            '{$mes_info['fecha_fin']}',
+                            $empresa,
+                            $codigo_activo,
+                            $empresa,
+                            $sucursal,
+                            $valor_mensual
+                        )";
+                        $oIfx->QueryT($sql_insert_met);
+                        $valores_mensuales_creados++;
+                    } else {
+                        $meses_omitidos++;
+                        $warnings[] = "No se generó depreciación para el activo {$clave_activo} en {$periodo_mes} porque no existe valor mensual en saemet.";
+                        continue;
+                    }
+                }
+
+                $sql_existe = "select count(cdep_gas_depn) as existe
+                    from saecdep
                     where cdep_cod_acti = $codigo_activo
-                    and cdep_fec_depr = '$fecha_mes'";
-                $oIfx->QueryT($sql_borra);
-                $registros_reprocesados++;
-            } else {
-                $registros_generados++;
-            }
+                    and cdep_ani_depr = $anio
+                    and cdep_mes_depr = $mes
+                    and act_cod_empr = $empresa";
+                $existe = consulta_string($sql_existe, 'existe', $oIfx, 0);
 
-            $sql_dep_acumulada = "SELECT (coalesce(cdep_dep_acum, 0) + coalesce(cdep_gas_depn, 0)) as depr_acumulada
-                from saecdep
-                where cdep_cod_acti = $codigo_activo
-                and cdep_fec_depr = '$fechaAnterior'";
-            $valor_acumulado = consulta_string($sql_dep_acumulada, 'depr_acumulada', $oIfx, 0);
+                if ($existe > 0) {
+                    $sql_borra = "delete from saecdep
+                        where cdep_cod_acti = $codigo_activo
+                        and cdep_ani_depr = $anio
+                        and cdep_mes_depr = $mes
+                        and act_cod_empr = $empresa";
+                    $oIfx->QueryT($sql_borra);
+                    $registros_reprocesados++;
+                } else {
+                    $registros_generados++;
+                }
 
-            if ($valor_acumulado == 0) {
-                $valor_anterior = 0;
-                $valor_acumulado = $valor_mensual;
-            } else {
-                $valor_anterior = $valor_acumulado - $valor_mensual;
-            }
+                $fechaAnterior = (new DateTime($fecha_mes))->modify('last day of previous month')->format('Y-m-d');
+                $sql_dep_acumulada = "SELECT (coalesce(cdep_dep_acum, 0) + coalesce(cdep_gas_depn, 0)) as depr_acumulada
+                    from saecdep
+                    where cdep_cod_acti = $codigo_activo
+                    and cdep_fec_depr = '$fechaAnterior'";
+                $valor_acumulado = consulta_string($sql_dep_acumulada, 'depr_acumulada', $oIfx, 0);
 
-            $sql_cdep = "INSERT into saecdep (cdep_cod_acti, cdep_cod_tdep,     cdep_mes_depr, cdep_ani_depr,
+                if ($valor_acumulado == 0) {
+                    $valor_anterior = 0;
+                    $valor_acumulado = $valor_mensual;
+                } else {
+                    $valor_anterior = $valor_acumulado - $valor_mensual;
+                }
+
+                $sql_cdep = "INSERT into saecdep (cdep_cod_acti, cdep_cod_tdep,     cdep_mes_depr, cdep_ani_depr,
                                                      cdep_fec_depr, act_cod_empr,       act_cod_sucu,  cdep_dep_acum,
                                                      cdep_gas_depn, cdep_est_cdep,      cdep_fec_cdep, cdep_val_rep1 )
-                                values ($codigo_activo, '$tipo_depreciacion', $mes, $anio,
-                                                    '$fecha_mes',  $empresa,            $sucursal,      $valor_acumulado ,
-                                                    $valor_mensual,      'PE',           '$fechaServer',    $valor_anterior)";
-            $oIfx->QueryT($sql_cdep);
-        } while ($oIfxA->SiguienteRegistro());
+                                    values ($codigo_activo, '$tipo_depreciacion', $mes, $anio,
+                                                '$fecha_mes',  $empresa,            $sucursal,      $valor_acumulado ,
+                                                $valor_mensual,      'PE',           '$fechaServer',    $valor_anterior)";
+                $oIfx->QueryT($sql_cdep);
+            }
+        }
 
         $oIfx->QueryT('COMMIT WORK;');
 
@@ -811,9 +876,11 @@ function generar($aForm = '')
             html: '<div style=\"text-align:left;\">' +
                   '<div><strong>Rango procesado:</strong> {$periodo_inicio} a {$periodo_fin}</div>' +
                   '<div><strong>Activos evaluados:</strong> {$total_activos}</div>' +
-                  '<div><strong>Registros generados:</strong> {$registros_generados}</div>' +
+                  '<div><strong>Meses evaluados:</strong> {$meses_procesados}</div>' +
+                  '<div><strong>Valores mensuales creados (saemet):</strong> {$valores_mensuales_creados}</div>' +
+                  '<div><strong>Depreciaciones generadas:</strong> {$registros_generados}</div>' +
                   '<div><strong>Registros reprocesados:</strong> {$registros_reprocesados}</div>' +
-                  '<div><strong>Meses omitidos (sin saemet):</strong> {$meses_omitidos}</div>' +
+                  '<div><strong>Meses omitidos (sin datos mínimos):</strong> {$meses_omitidos}</div>' +
                   '<hr>' +
                   '<div><strong>Advertencias:</strong></div>' +
                   '{$detalle_advertencias}' +
