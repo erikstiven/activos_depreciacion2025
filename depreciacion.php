@@ -41,7 +41,7 @@
         }		
         function generar(){
             if(ProcesarFormulario() == true && validar_rango_fechas()){
-                xajax_generar(xajax.getFormValues("form1"));
+                xajax_prevalidar_depreciacion(xajax.getFormValues("form1"));
             }
         }
 		
@@ -350,11 +350,10 @@
                     <div class="col-md-12">
                         <div class="form-row">
                             <div class="col-md-2">
-                                <label for="solo_vigentes"> Vigencia </label>
-                                <select id="solo_vigentes" name="solo_vigentes" class="form-control input-sm select2" onchange="f_filtro_activos();">
-                                    <option value="1">Solo vigentes</option>
-                                    <option value="0">Todos</option>
-                                </select>
+                                <label for="solo_vigentes">Solo activos vigentes</label>
+                                <div>
+                                    <input type="checkbox" id="solo_vigentes" name="solo_vigentes" value="1" checked onchange="f_filtro_activos();">
+                                </div>
                             </div>
                             <div class="col-md-2">
                                 <label for="anio_desde">* Año Desde </label>
@@ -418,7 +417,7 @@
         </div>
     </body>
          
-    <script>genera_cabecera_formulario(); generaSelect2(); f_filtro_activos();/*genera_detalle();genera_form_detalle();*/</script> 
+    <script>genera_cabecera_formulario(); generaSelect2();/*genera_detalle();genera_form_detalle();*/</script> 
     <? /*     * ***************************************************************** */ ?>
     <? /* NO MODIFICAR ESTA SECCION */ ?>
 <? } ?>
