@@ -298,9 +298,11 @@
                                     $lista_mes .= "<option value=\"{$codigo}\"{$selected}>{$descripcion}</option>";
                                 }
                                 // LISTA GRUPOS
-                                $sql = " SELECT gact_cod_gact, gact_des_gact
+                                $gruposPermitidos = "'MAQ','CVM','EDI','EQC','INS','MBE','OTA','RBM','RHE','VLI'";
+                                $sql = " SELECT DISTINCT gact_cod_gact, gact_des_gact
                                         FROM saegact
-                                        WHERE gact_cod_empr  = $idempresa ";                               								
+                                        WHERE gact_cod_empr  = $idempresa
+                                        AND gact_cod_gact IN ($gruposPermitidos) ";                               								
                                 $listaGrupo = lista_boostrap_func($oIfx, $sql, '', 'gact_cod_gact',  'gact_des_gact' );
 
                                 // LISTA SUBGRUPOS
