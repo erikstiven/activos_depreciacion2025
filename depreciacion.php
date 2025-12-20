@@ -379,6 +379,12 @@
                                 </div>
                             </div>
                             <div class="col-md-2">
+                                <label for="debug_filtros">Depurar filtros</label>
+                                <div>
+                                    <input type="checkbox" id="debug_filtros" name="debug_filtros" value="1">
+                                </div>
+                            </div>
+                            <div class="col-md-2">
                                 <label for="anio_desde">* Año Desde </label>
                                 <select id="anio_desde" name="anio_desde" class="form-control input-sm select2" required>
                                     <option value="">Seleccione una opcion..</option>
