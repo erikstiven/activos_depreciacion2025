@@ -322,9 +322,8 @@
                                         ORDER BY gact_des_gact ";                               								
                                 $listaGrupo = lista_boostrap_func($oIfx, $sql, '', 'gact_cod_gact',  'gact_des_gact' );
 
-                                // LISTA SUBGRUPOS
-                                $sql = " SELECT sgac_cod_sgac, sgac_des_sgac from saesgac where sgac_cod_empr = $idempresa ";
-                                $listaSubGrupo = lista_boostrap_func($oIfx, $sql, '', 'sgac_cod_sgac',  'sgac_des_sgac' );
+                                // LISTA SUBGRUPOS (se cargan al seleccionar grupo)
+                                $listaSubGrupo = '';
                             ?>
                     </div>
                     <div class="col-md-12">
@@ -361,7 +360,6 @@
                             <div class="col-md-3">
                                 <label for="cod_subgrupo"> Subgrupo </label>
                                 <select id="cod_subgrupo" name="cod_subgrupo[]" class="form-control input-sm select2" multiple="multiple" onchange="limpiar_activos(); f_filtro_activos();">
-                                    <?=$listaSubGrupo;?>
                                 </select>
                             </div>
                         </div>
