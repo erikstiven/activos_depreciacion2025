@@ -213,7 +213,6 @@ function f_filtro_activos_desde($aForm)
     $solo_vigentes = !empty($aForm['solo_vigentes']) ? 1 : 0;
     $generar_mensual = !empty($aForm['generar_mensual']) ? 1 : 0;
     $debug_filtros = !empty($aForm['debug_filtros']) ? 1 : 0;
-    $generar_mensual = !empty($aForm['generar_mensual']) ? 1 : 0;
     if (empty($empresa)) {
         $empresa = $idempresa;
     }
@@ -547,27 +546,37 @@ function prevalidar_depreciacion($aForm = '')
         return $oReturn;
     }
 
+    if ($debug_filtros == 1) {
+        $oReturn->alert(
+            "DEPURACION GENERAR\n" .
+            "Empresa: {$empresa}\n" .
+            "Sucursal: {$sucursal}\n" .
+            "Grupos: " . implode(', ', $grupo) . "\n" .
+            "Subgrupos: " . implode(', ', $subgrupo) . "\n" .
+            "Activos: {$activo_desde} - {$activo_hasta}\n" .
+            "Solo vigentes: {$solo_vigentes}\n" .
+            "Generar mensual: {$generar_mensual}\n" .
+            "Activos encontrados: {$total_activos}"
+        );
+    }
+
     $meses_procesar = calcular_meses($anio_desde, $mes_desde, $anio_hasta, $mes_hasta);
     $periodo_inicio = formatear_periodo($anio_desde, $mes_desde);
     $periodo_fin = formatear_periodo($anio_hasta, $mes_hasta);
 
     if ($debug_filtros == 1) {
-        $oReturn->script("Swal.fire({
-            title: 'Depuración de filtros',
-            html: '<div style=\"text-align:left;\">' +
-                  '<div><strong>Empresa:</strong> {$empresa}</div>' +
-                  '<div><strong>Sucursal:</strong> {$sucursal}</div>' +
-                  '<div><strong>Grupos:</strong> " . addslashes(implode(', ', $grupo)) . "</div>' +
-                  '<div><strong>Subgrupos:</strong> " . addslashes(implode(', ', $subgrupo)) . "</div>' +
-                  '<div><strong>Activos:</strong> {$activo_desde} - {$activo_hasta}</div>' +
-                  '<div><strong>Solo vigentes:</strong> {$solo_vigentes}</div>' +
-                  '<div><strong>Generar mensual:</strong> {$generar_mensual}</div>' +
-                  '<div><strong>Rango:</strong> {$periodo_inicio} a {$periodo_fin}</div>' +
-                  '<div><strong>Activos encontrados:</strong> {$total_activos}</div>' +
-                  '</div>',
-            confirmButtonText: 'Continuar',
-            type: 'info'
-        })");
+        $oReturn->alert(
+            "DEPURACION FILTROS\n" .
+            "Empresa: {$empresa}\n" .
+            "Sucursal: {$sucursal}\n" .
+            "Grupos: " . implode(', ', $grupo) . "\n" .
+            "Subgrupos: " . implode(', ', $subgrupo) . "\n" .
+            "Activos: {$activo_desde} - {$activo_hasta}\n" .
+            "Solo vigentes: {$solo_vigentes}\n" .
+            "Generar mensual: {$generar_mensual}\n" .
+            "Rango: {$periodo_inicio} a {$periodo_fin}\n" .
+            "Activos encontrados: {$total_activos}"
+        );
     }
 
     $operacion = $generar_mensual == 1 ? 'Completar y Recalcular depreciaciones' : 'Reprocesar depreciaciones existentes';
