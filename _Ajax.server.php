@@ -20,6 +20,18 @@ function normalizar_lista($valor)
     return array($valor);
 }
 
+function normalizar_formulario($aForm)
+{
+    if (!is_array($aForm)) {
+        return $aForm;
+    }
+    $normalizado = array();
+    foreach ($aForm as $key => $value) {
+        $normalizado[trim($key)] = $value;
+    }
+    return $normalizado;
+}
+
 function lista_sql($items)
 {
     $items = array_map(function ($item) {
@@ -100,6 +112,7 @@ function f_filtro_sucursal($aForm, $data)
     $oReturn = new xajaxResponse();
 
     //variables formulario
+    $aForm = normalizar_formulario($aForm);
     $empresa = $aForm['empresa'];
     if (empty($empresa)) {
         $empresa = $_SESSION['U_EMPRESA'];
@@ -141,6 +154,7 @@ function f_filtro_anio($aForm, $data)
     $oIfx->Conectar();
 
     $oReturn = new xajaxResponse();
+    $aForm = normalizar_formulario($aForm);
     $idempresa = $_SESSION['U_EMPRESA'];
     //variables formulario
     $empresa = $aForm['empresa'];
@@ -191,12 +205,12 @@ function f_filtro_activos_desde($aForm)
     $idempresa = $_SESSION['U_EMPRESA'];
     $idsucursal = $_SESSION['U_SUCURSAL'];
     //variables formulario
+    $aForm = normalizar_formulario($aForm);
     $empresa = $aForm['empresa'];
     $sucursal = $aForm['sucursal'];
     $grupo = normalizar_lista($aForm['cod_grupo']);
     $subgrupo = normalizar_lista($aForm['cod_subgrupo']);
     $solo_vigentes = !empty($aForm['solo_vigentes']) ? 1 : 0;
-    $generar_mensual = !empty($aForm['generar_mensual']) ? 1 : 0;
     $generar_mensual = !empty($aForm['generar_mensual']) ? 1 : 0;
     if (empty($empresa)) {
         $empresa = $idempresa;
@@ -267,6 +281,7 @@ function f_filtro_mes($aForm, $data)
     $oIfx->Conectar();
 
     $oReturn = new xajaxResponse();
+    $aForm = normalizar_formulario($aForm);
 
     $meses = array(
         '1' => 'Enero',
@@ -315,6 +330,7 @@ function f_filtro_grupo($aForm, $data)
     $oIfx->Conectar();
 
     $oReturn = new xajaxResponse();
+    $aForm = normalizar_formulario($aForm);
     $idempresa = $_SESSION['U_EMPRESA'];
     $idsucursal = $_SESSION['U_SUCURSAL'];
     //variables formulario
@@ -369,6 +385,7 @@ function f_filtro_subgrupo($aForm = '')
     $oIfx->Conectar();
 
     $oReturn = new xajaxResponse();
+    $aForm = normalizar_formulario($aForm);
     $idempresa = $_SESSION['U_EMPRESA'];
     //variables formulario	
     $empresa = $aForm['empresa'];
@@ -426,6 +443,7 @@ function prevalidar_depreciacion($aForm = '')
     $oIfx->Conectar();
 
     $oReturn = new xajaxResponse();
+    $aForm = normalizar_formulario($aForm);
 
     $idempresa = $_SESSION['U_EMPRESA'];
     $idsucursal = $_SESSION['U_SUCURSAL'];
@@ -579,6 +597,7 @@ function generar($aForm = '')
     $oReturn = new xajaxResponse();
 
     //variables de sesion
+    $aForm = normalizar_formulario($aForm);
     $array = ($_SESSION['ARRAY_PINTA']);
     $usuario_web = $_SESSION['U_ID'];
     $idempresa = $_SESSION['U_EMPRESA'];
