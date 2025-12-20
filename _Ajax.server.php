@@ -754,6 +754,79 @@ function generar($aForm = '')
         $oIfx->QueryT('BEGIN');
         $oIfx->Free();
 
+        if ($generar_mensual == 1) {
+            $sql_count_missing = "SELECT COUNT(1) AS total
+                FROM saeact a
+                CROSS JOIN generate_series(
+                    DATE '$fecha_desde',
+                    DATE '$fecha_hasta',
+                    INTERVAL '1 month'
+                ) AS gs(mes)
+                LEFT JOIN saemet sm
+                    ON sm.metd_cod_acti = a.act_cod_act
+                    AND sm.metd_has_fech = (date_trunc('month', gs.mes) + INTERVAL '1 month - 1 day')::date
+                    AND sm.metd_cod_empr = a.act_cod_empr
+                    AND sm.act_cod_empr = a.act_cod_empr
+                    AND sm.act_cod_sucu = a.act_cod_sucu
+                WHERE a.act_cod_empr = $empresa
+                  AND a.act_cod_sucu = $sucursal
+                  $filtro_activo
+                  AND a.act_vutil_act IS NOT NULL
+                  AND a.act_vutil_act > 0
+                  AND a.act_val_comp IS NOT NULL
+                  AND a.act_val_comp > 0
+                  AND sm.metd_cod_acti IS NULL";
+            $pendientes = consulta_string_func($sql_count_missing, 'total', $oIfx, 0);
+
+            if (!empty($pendientes) && $pendientes > 0) {
+                $sql_insert_met = "INSERT INTO saemet (
+                        met_anio_met,
+                        metd_des_fech,
+                        metd_has_fech,
+                        metd_cod_empr,
+                        metd_cod_acti,
+                        act_cod_empr,
+                        act_cod_sucu,
+                        metd_val_metd
+                    )
+                    SELECT
+                        EXTRACT(YEAR FROM gs.mes)::int AS met_anio_met,
+                        date_trunc('month', gs.mes)::date AS metd_des_fech,
+                        (date_trunc('month', gs.mes) + INTERVAL '1 month - 1 day')::date AS metd_has_fech,
+                        a.act_cod_empr AS metd_cod_empr,
+                        a.act_cod_act AS metd_cod_acti,
+                        a.act_cod_empr,
+                        a.act_cod_sucu,
+                        ROUND(
+                            (a.act_val_comp - COALESCE(a.act_vres_act, 0))
+                            / NULLIF(a.act_vutil_act * 12, 0),
+                            6
+                        ) AS metd_val_metd
+                    FROM saeact a
+                    CROSS JOIN generate_series(
+                        DATE '$fecha_desde',
+                        DATE '$fecha_hasta',
+                        INTERVAL '1 month'
+                    ) AS gs(mes)
+                    LEFT JOIN saemet sm
+                        ON sm.metd_cod_acti = a.act_cod_act
+                        AND sm.metd_has_fech = (date_trunc('month', gs.mes) + INTERVAL '1 month - 1 day')::date
+                        AND sm.metd_cod_empr = a.act_cod_empr
+                        AND sm.act_cod_empr = a.act_cod_empr
+                        AND sm.act_cod_sucu = a.act_cod_sucu
+                    WHERE a.act_cod_empr = $empresa
+                      AND a.act_cod_sucu = $sucursal
+                      $filtro_activo
+                      AND a.act_vutil_act IS NOT NULL
+                      AND a.act_vutil_act > 0
+                      AND a.act_val_comp IS NOT NULL
+                      AND a.act_val_comp > 0
+                      AND sm.metd_cod_acti IS NULL";
+                $oIfx->QueryT($sql_insert_met);
+                $valores_mensuales_creados += (int)$pendientes;
+            }
+        }
+
         $sql_activos = "SELECT distinct
                 act_cod_act,
                 act_clave_act,
