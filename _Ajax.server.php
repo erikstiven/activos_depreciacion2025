@@ -513,6 +513,7 @@ function prevalidar_depreciacion($aForm = '')
     $sql_activos = "select count(distinct act_cod_act) as total
         from saeact
         where act_cod_empr = $empresa
+        and act_cod_sucu = $sucursal
         $filtro_activo";
     $total_activos = consulta_string_func($sql_activos, 'total', $oIfx, 0);
     if (empty($total_activos) || $total_activos == 0) {
@@ -669,6 +670,7 @@ function generar($aForm = '')
     $sql_activos = "select count(distinct act_cod_act) as total
         from saeact
         where act_cod_empr = $empresa
+        and act_cod_sucu = $sucursal
         $filtro_activo";
     $total_activos = consulta_string_func($sql_activos, 'total', $oIfx, 0);
     if (empty($total_activos) || $total_activos == 0) {
@@ -714,6 +716,7 @@ function generar($aForm = '')
                 act_vres_act
             FROM saeact
             WHERE act_cod_empr = $empresa
+            and act_cod_sucu = $sucursal
             $filtro_activo
             ORDER BY act_cod_act";
 
@@ -767,7 +770,9 @@ function generar($aForm = '')
                     from saemet
                     where metd_cod_acti = $codigo_activo
                     and metd_has_fech = '$fecha_mes'
-                    and act_cod_empr = $empresa";
+                    and metd_cod_empr = $empresa
+                    and act_cod_empr = $empresa
+                    and act_cod_sucu = $sucursal";
                 $valor_mensual = consulta_string($sql_valor, 'metd_val_metd', $oIfx, 0);
 
                 if (empty($valor_mensual) || $valor_mensual == 0) {
