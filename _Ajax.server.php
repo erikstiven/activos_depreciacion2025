@@ -793,6 +793,17 @@ function generar($aForm = '')
                     and act_cod_empr = $empresa
                     and act_cod_sucu = $sucursal";
                 $valor_mensual = consulta_string($sql_valor, 'metd_val_metd', $oIfx, 0);
+                if (empty($valor_mensual) || $valor_mensual == 0) {
+                    $sql_valor_mes = "select metd_val_metd
+                        from saemet
+                        where metd_cod_acti = $codigo_activo
+                        and extract(year from metd_has_fech) = $anio
+                        and extract(month from metd_has_fech) = $mes
+                        and metd_cod_empr = $empresa
+                        and act_cod_empr = $empresa
+                        and act_cod_sucu = $sucursal";
+                    $valor_mensual = consulta_string($sql_valor_mes, 'metd_val_metd', $oIfx, 0);
+                }
 
                 if (empty($valor_mensual) || $valor_mensual == 0) {
                     if ($generar_mensual == 1) {
