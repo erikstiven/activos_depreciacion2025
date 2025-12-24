@@ -392,7 +392,7 @@ function generar($aForm = '')
     $fechaServer = date("Y-m-d");
     //echo $fecha_hasta; 
 
-    // ARMA FECHA ANTERIOR
+    // ARMA FECHA ANTERIOR 8
     if ($mes > 1) {
         $mesAnterior = $mes - 1;
         $anioAnterior =  $anio;
